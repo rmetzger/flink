@@ -395,7 +395,8 @@ public abstract class ExecutionEnvironment {
 		}
 		catch (Exception e) {
 			throw new InvalidProgramException("The type returned by the input format could not be automatically determined. " +
-					"Please specify the TypeInformation of the produced type explicitly.");
+					"Please specify the TypeInformation of the produced type explicitly by using the " +
+					"'createInput(InputFormat, TypeInformation)' method instead.");
 		}
 	}
 	
@@ -408,7 +409,7 @@ public abstract class ExecutionEnvironment {
 	 * <p>
 	 * Since all data sets need specific information about their types, this method needs to determine
 	 * the type of the data produced by the input format. It will attempt to determine the data type
-	 * by reflection, unless the the input format implements the {@link ResultTypeQueryable} interface.
+	 * by reflection, unless the input format implements the {@link ResultTypeQueryable} interface.
 	 * In the latter case, this method will invoke the {@link ResultTypeQueryable#getProducedType()}
 	 * method to determine data type produced by the input format.
 	 * 
@@ -427,7 +428,8 @@ public abstract class ExecutionEnvironment {
 		}
 		catch (Exception e) {
 			throw new InvalidProgramException("The type returned by the input format could not be automatically determined. " +
-					"Please specify the TypeInformation of the produced type explicitly.");
+					"Please specify the TypeInformation of the produced type explicitly by using the " +
+					"'createInput(InputFormat, TypeInformation)' method instead.");
 		}
 	}
 
@@ -843,7 +845,7 @@ public abstract class ExecutionEnvironment {
 	// --------------------------------------------------------------------------------------------
 	//  Instantiation of Execution Contexts
 	// --------------------------------------------------------------------------------------------
-	
+
 	/**
 	 * Creates an execution environment that represents the context in which the program is currently executed.
 	 * If the program is invoked standalone, this method returns a local execution environment, as returned by
@@ -856,7 +858,19 @@ public abstract class ExecutionEnvironment {
 		return contextEnvironmentFactory == null ? 
 				createLocalEnvironment() : contextEnvironmentFactory.createExecutionEnvironment();
 	}
-	
+
+	/**
+	 * Creates a {@link CollectionEnvironment} that uses Java Collections underneath. This will execute in a
+	 * single thread in the current JVM. It is very fast but will fail if the data does not fit into
+	 * memory. Degree of parallelism will always be 1. This is useful during implementation and for debugging.
+	 * @return A Collection Environment
+	 */
+	public static CollectionEnvironment createCollectionsEnvironment(){
+		CollectionEnvironment ce = new CollectionEnvironment();
+		ce.setDegreeOfParallelism(1);
+		return ce;
+	}
+
 	/**
 	 * Creates a {@link LocalEnvironment}. The local execution environment will run the program in a
 	 * multi-threaded fashion in the same JVM as the environment was created in. The default degree of

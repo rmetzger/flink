@@ -75,7 +75,7 @@ DEFAULT_ENV_SSH_OPTS=""                             # Optional SSH parameters ru
 # CONFIG KEYS: The default values can be overwritten by the following keys in conf/flink-conf.yaml
 ########################################################################################################################
 
-KEY_JOBM_HEAP_MB="jobManager.heap.mb"
+KEY_JOBM_HEAP_MB="jobmanager.heap.mb"
 KEY_TASKM_HEAP_MB="taskmanager.heap.mb"
 KEY_ENV_PID_DIR="env.pid.dir"
 KEY_ENV_LOG_MAX="env.log.max"
@@ -152,6 +152,8 @@ fi
 if [ -z "${HOSTNAME}" ]; then
     HOSTNAME=`hostname`
 fi
+
+IS_NUMBER="^[0-9]+$"
 
 # Define FLINK_JM_HEAP if it is not already set
 if [ -z "${FLINK_JM_HEAP}" ]; then

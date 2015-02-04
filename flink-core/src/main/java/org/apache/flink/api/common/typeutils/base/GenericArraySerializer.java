@@ -72,7 +72,10 @@ public final class GenericArraySerializer<C> extends TypeSerializer<C[]> {
 		C[] copy = create(from.length);
 
 		for (int i = 0; i < copy.length; i++) {
-			copy[i] = this.componentSerializer.copy(from[i], this.componentSerializer.createInstance());
+			C val = from[i];
+			if (val != null) {
+				copy[i] = this.componentSerializer.copy(val);
+			}
 		}
 
 		return copy;

@@ -21,6 +21,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -31,16 +32,17 @@ import java.util.Map;
 import org.apache.flink.client.FlinkYarnSessionCli;
 import org.apache.flink.runtime.yarn.AbstractFlinkYarnClient;
 import org.apache.flink.runtime.yarn.AbstractFlinkYarnCluster;
+import org.apache.hadoop.fs.permission.FsAction;
+import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.yarn.api.records.ApplicationReport;
 import org.apache.hadoop.yarn.api.records.YarnApplicationState;
+import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.flink.configuration.ConfigConstants;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.permission.FsAction;
-import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.api.protocolrecords.GetNewApplicationResponse;
@@ -89,8 +91,6 @@ public class FlinkYarnClient extends AbstractFlinkYarnClient {
 	public static final String ENV_SLOTS = "_SLOTS";
 	public static final String ENV_DYNAMIC_PROPERTIES = "_DYNAMIC_PROPERTIES";
 
-	private static final String DEFAULT_QUEUE_NAME = "default";
-
 
 	/**
 	 * Minimum memory requirements, checked by the Client.
@@ -120,7 +120,7 @@ public class FlinkYarnClient extends AbstractFlinkYarnClient {
 
 	private int taskManagerCount = 1;
 
-	private String yarnQueue = DEFAULT_QUEUE_NAME;
+	private String yarnQueue = null;
 
 	private String configurationDirectory;
 
@@ -137,17 +137,21 @@ public class FlinkYarnClient extends AbstractFlinkYarnClient {
 
 
 	public FlinkYarnClient() {
-		// Check if security is enabled
-		if(UserGroupInformation.isSecurityEnabled()) {
-			throw new RuntimeException("Flink YARN client does not have security support right now."
-					+ "File a bug, we will fix it asap");
-		}
-		conf = Utils.initializeYarnConfiguration();
+		conf = new YarnConfiguration();
 		if(this.yarnClient == null) {
 			// Create yarnClient
 			yarnClient = YarnClient.createYarnClient();
 			yarnClient.init(conf);
 			yarnClient.start();
+		}
+
+		// for unit tests only
+		if(System.getenv("IN_TESTS") != null) {
+			try {
+				conf.addResource(new File(System.getenv("YARN_CONF_DIR") + "/yarn-site.xml").toURI().toURL());
+			} catch (Throwable t) {
+				throw new RuntimeException("Error",t);
+			}
 		}
 	}
 
@@ -264,6 +268,13 @@ public class FlinkYarnClient extends AbstractFlinkYarnClient {
 			throw new YarnDeploymentException("Flink configuration object has not been set");
 		}
 
+		// check if required Hadoop environment variables are set. If not, warn user
+		if(System.getenv("HADOOP_CONF_DIR") == null ||
+				System.getenv("YARN_CONF_DIR") == null) {
+			LOG.warn("Neither the HADOOP_CONF_DIR nor the YARN_CONF_DIR environment variable is set." +
+					"The Flink YARN Client needs one of these to be set to properly load the Hadoop " +
+					"configuration for accessing YARN.");
+		}
 	}
 
 	public static boolean allocateResource(int[] nodeManagers, int toAllocate) {
@@ -276,12 +287,31 @@ public class FlinkYarnClient extends AbstractFlinkYarnClient {
 		return false;
 	}
 
+	public AbstractFlinkYarnCluster deploy(final String clusterName) throws Exception {
+
+		UserGroupInformation.setConfiguration(conf);
+		UserGroupInformation ugi = UserGroupInformation.getCurrentUser();
+
+		if (UserGroupInformation.isSecurityEnabled()) {
+			if (!ugi.hasKerberosCredentials()) {
+				throw new YarnDeploymentException("In secure mode. Please provide Kerberos credentials in order to authenticate. " +
+						"You may use kinit to authenticate and request a TGT from the Kerberos server.");
+			}
+			return ugi.doAs(new PrivilegedExceptionAction<AbstractFlinkYarnCluster>() {
+				@Override
+				public AbstractFlinkYarnCluster run() throws Exception {
+					return deployInternal(clusterName);
+				}
+			});
+		} else {
+			return deployInternal(clusterName);
+		}
+	}
 	/**
 	 * This method will block until the ApplicationMaster/JobManager have been
 	 * deployed on YARN.
 	 */
-	@Override
-	public AbstractFlinkYarnCluster deploy(String clusterName) throws Exception {
+	protected AbstractFlinkYarnCluster deployInternal(String clusterName) throws Exception {
 		isReadyForDepoyment();
 
 		LOG.info("Using values:");
@@ -296,7 +326,7 @@ public class FlinkYarnClient extends AbstractFlinkYarnClient {
 		// ------------------ Check if the specified queue exists --------------
 
 		List<QueueInfo> queues = yarnClient.getAllQueues();
-		if(queues.size() > 0) { // check only if there are queues configured.
+		if(queues.size() > 0 && this.yarnQueue != null) { // check only if there are queues configured in yarn and for this session.
 			boolean queueFound = false;
 			for (QueueInfo queue : queues) {
 				if (queue.getQueueName().equals(this.yarnQueue)) {
@@ -460,18 +490,18 @@ public class FlinkYarnClient extends AbstractFlinkYarnClient {
 
 
 		// setup security tokens (code from apache storm)
-		final Path[] paths = new Path[3 + shipFiles.size()];
+		final Path[] paths = new Path[2 + shipFiles.size()];
 		StringBuffer envShipFileList = new StringBuffer();
 		// upload ship files
 		for (int i = 0; i < shipFiles.size(); i++) {
 			File shipFile = shipFiles.get(i);
 			LocalResource shipResources = Records.newRecord(LocalResource.class);
 			Path shipLocalPath = new Path("file://" + shipFile.getAbsolutePath());
-			paths[3 + i] = Utils.setupLocalResource(conf, fs, appId.toString(),
+			paths[2 + i] = Utils.setupLocalResource(conf, fs, appId.toString(),
 					shipLocalPath, shipResources, fs.getHomeDirectory());
 			localResources.put(shipFile.getName(), shipResources);
 
-			envShipFileList.append(paths[3 + i]);
+			envShipFileList.append(paths[2 + i]);
 			if(i+1 < shipFiles.size()) {
 				envShipFileList.append(',');
 			}
@@ -480,10 +510,11 @@ public class FlinkYarnClient extends AbstractFlinkYarnClient {
 		paths[0] = remotePathJar;
 		paths[1] = remotePathConf;
 		sessionFilesDir = new Path(fs.getHomeDirectory(), ".flink/" + appId.toString() + "/");
-		FsPermission permission = new FsPermission(FsAction.ALL, FsAction.ALL, FsAction.ALL);
-		fs.setPermission(sessionFilesDir, permission); // set permission for path.
-		Utils.setTokensFor(amContainer, paths, this.conf);
 
+		FsPermission permission = new FsPermission(FsAction.ALL, FsAction.NONE, FsAction.NONE);
+		fs.setPermission(sessionFilesDir, permission); // set permission for path.
+
+		Utils.setTokensFor(amContainer, paths, conf);
 
 		amContainer.setLocalResources(localResources);
 		fs.close();
@@ -497,7 +528,7 @@ public class FlinkYarnClient extends AbstractFlinkYarnClient {
 		appMasterEnv.put(FlinkYarnClient.FLINK_JAR_PATH, remotePathJar.toString() );
 		appMasterEnv.put(FlinkYarnClient.ENV_APP_ID, appId.toString());
 		appMasterEnv.put(FlinkYarnClient.ENV_CLIENT_HOME_DIR, fs.getHomeDirectory().toString());
-		appMasterEnv.put(FlinkYarnClient.ENV_CLIENT_SHIP_FILES, envShipFileList.toString() );
+		appMasterEnv.put(FlinkYarnClient.ENV_CLIENT_SHIP_FILES, envShipFileList.toString());
 		appMasterEnv.put(FlinkYarnClient.ENV_CLIENT_USERNAME, UserGroupInformation.getCurrentUser().getShortUserName());
 		appMasterEnv.put(FlinkYarnClient.ENV_SLOTS, String.valueOf(slots));
 		if(dynamicPropertiesEncoded != null) {
@@ -519,8 +550,9 @@ public class FlinkYarnClient extends AbstractFlinkYarnClient {
 		appContext.setApplicationType("Apache Flink");
 		appContext.setAMContainerSpec(amContainer);
 		appContext.setResource(capability);
-		appContext.setQueue(yarnQueue);
-
+		if(yarnQueue != null) {
+			appContext.setQueue(yarnQueue);
+		}
 
 		LOG.info("Submitting application master " + appId);
 		yarnClient.submitApplication(appContext);

@@ -488,7 +488,7 @@ object ExecutionEnvironment {
   }
 
   /**
-   * Createa an execution environment that uses Java Collections underneath. This will execute in a
+   * Creates an execution environment that uses Java Collections underneath. This will execute in a
    * single thread in the current JVM. It is very fast but will fail if the data does not fit into
    * memory. This is useful during implementation and for debugging.
    * @return
