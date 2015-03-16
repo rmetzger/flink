@@ -53,6 +53,9 @@ public class SimpleKafkaSource<OUT> extends ConnectorSource<OUT> {
 		while (iterator.hasNext()) {
 			MessageWithMetadata msg = iterator.nextWithOffset();
 			OUT out = schema.deserialize(msg.getMessage());
+			if (schema.isEndOfStream(out)) {
+				break;
+			}
 			collector.collect(out);
 		}
 	}
