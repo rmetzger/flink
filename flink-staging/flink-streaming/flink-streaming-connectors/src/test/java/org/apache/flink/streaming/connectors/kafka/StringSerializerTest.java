@@ -19,9 +19,11 @@ package org.apache.flink.streaming.connectors.kafka;
 
 import static org.junit.Assert.assertEquals;
 
+import java.io.IOException;
 import java.io.Serializable;
 
 import org.apache.flink.streaming.connectors.kafka.config.StringSerializer;
+import org.junit.Assert;
 import org.junit.Test;
 
 public class StringSerializerTest {
@@ -54,16 +56,16 @@ public class StringSerializerTest {
 
 	@Test
 	public void test() {
-
-		MyClass myObject = new MyClass(42, "test string");
-
-		StringSerializer<MyClass> stringSerializer = new StringSerializer<MyClass>();
-
-		String store = stringSerializer.serialize(myObject);
-
-		MyClass myObjectDeserialized = stringSerializer.deserialize(store);
-
-		assertEquals(myObject, myObjectDeserialized);
+		try {
+			MyClass myObject = new MyClass(42, "test string");
+			StringSerializer<MyClass> stringSerializer = new StringSerializer<MyClass>();
+			String store = stringSerializer.serialize(myObject);
+			MyClass myObjectDeserialized = stringSerializer.deserialize(store);
+			assertEquals(myObject, myObjectDeserialized);
+		} catch(IOException ioe) {
+			ioe.printStackTrace();
+			Assert.fail("Unexpected exception: " + ioe.getMessage());
+		}
 	}
 
 }

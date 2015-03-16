@@ -17,6 +17,7 @@
 
 package org.apache.flink.streaming.connectors.kafka.config;
 
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.Properties;
 
@@ -50,7 +51,11 @@ public abstract class KafkaConfigWrapper<T extends Serializable> {
 
 	public void read(VerifiableProperties properties) {
 		String stringWrapped = properties.getString(getClass().getCanonicalName());
-		wrapped = stringSerializer.deserialize(stringWrapped);
+		try {
+			wrapped = stringSerializer.deserialize(stringWrapped);
+		} catch (IOException e) {
+			throw new RuntimeException("Error deserializing the String", e);
+		}
 	}
 
 	public void write(Properties properties) {
