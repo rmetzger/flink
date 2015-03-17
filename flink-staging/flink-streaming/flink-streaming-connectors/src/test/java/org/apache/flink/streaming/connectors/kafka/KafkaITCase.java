@@ -80,19 +80,34 @@ public class KafkaITCase {
 	@Test
 	public void test() {
 		LOG.info("Starting KafkaITCase.test()");
+		TestingServer zookeeper = null;
+		KafkaServer broker1 = null;
 		try {
-			TestingServer zookeeper = getZookeper();
-			KafkaServer broker1 = getKafkaServer(0);
-
+			zookeeper = getZookeper();
+			broker1 = getKafkaServer(0);
+			LOG.info("ZK and KafkaServer started. Creating test topic:");
 			createTestTopic();
 
+			LOG.info("Starting Kafka Topology in Flink:");
 			startKafkaTopology();
 
-			broker1.shutdown();
-			zookeeper.stop();
+			LOG.info("Test suceeded. Shutting down services");
+
 		} catch(Exception t) {
 			LOG.warn("Test failed with exception", t);
 			Assert.fail("Test failed with: " + t.getMessage());
+		} finally {
+			if (zookeeper != null) {
+				try {
+					zookeeper.stop();
+				} catch (IOException e) {
+					LOG.warn("ZK.stop() failed",e);
+				}
+			}
+			if (broker1 != null) {
+				broker1.shutdown();
+			}
+
 		}
 
 	}
@@ -160,11 +175,12 @@ public class KafkaITCase {
 		kafkaProperties.put("port", Integer.toString(KAFKA_PORT));
 		kafkaProperties.put("broker.id", Integer.toString(brokerId));
 		kafkaProperties.put("log.dir", tmpKafkaDir.toString());
-		kafkaProperties.put("enable.zookeeper", "true");
-		kafkaProperties.put("zookeeper.connect", "localhost:"+ZK_PORT);
+		kafkaProperties.put("zookeeper.connect", zookeeperConnectionString);
 		KafkaConfig kafkaConfig = new KafkaConfig(kafkaProperties);
 
-		return new KafkaServer(kafkaConfig, new LocalSystemTime());
+		KafkaServer server = new KafkaServer(kafkaConfig, new LocalSystemTime());
+		server.startup();
+		return server;
 	}
 
 	public class LocalSystemTime implements Time {

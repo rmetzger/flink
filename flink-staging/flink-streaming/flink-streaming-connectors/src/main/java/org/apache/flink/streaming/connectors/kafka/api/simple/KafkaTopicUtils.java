@@ -51,6 +51,7 @@ public class KafkaTopicUtils {
 	public KafkaTopicUtils(String zookeeperServer, int sessionTimeoutMs, int connectionTimeoutMs) {
 		zkClient = new ZkClient(zookeeperServer, sessionTimeoutMs, connectionTimeoutMs,
 				new KafkaZKStringSerializer());
+		zkClient.waitUntilConnected();
 	}
 
 	public void createTopic(String topicName, int numOfPartitions, int replicationFactor) {
