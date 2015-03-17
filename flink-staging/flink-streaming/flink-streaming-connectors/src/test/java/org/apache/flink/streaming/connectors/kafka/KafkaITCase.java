@@ -27,15 +27,14 @@ import kafka.server.KafkaConfig;
 import kafka.server.KafkaServer;
 import kafka.utils.Time;
 import org.apache.curator.test.TestingServer;
-import org.apache.flink.configuration.Configuration;
+import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.function.co.RichCoFlatMapFunction;
 import org.apache.flink.streaming.connectors.kafka.api.KafkaSink;
 import org.apache.flink.streaming.connectors.kafka.api.simple.KafkaTopicUtils;
 import org.apache.flink.streaming.connectors.kafka.api.simple.PersistentKafkaSource;
 import org.apache.flink.streaming.connectors.util.JavaDefaultStringSchema;
-import org.apache.flink.util.Collector;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -91,12 +90,15 @@ public class KafkaITCase {
 			LOG.info("Starting Kafka Topology in Flink:");
 			startKafkaTopology();
 
-			LOG.info("Test suceeded. Shutting down services");
-
-		} catch(Exception t) {
+			LOG.info("Test succeeded.");
+		} catch(Throwable t) {
 			LOG.warn("Test failed with exception", t);
 			Assert.fail("Test failed with: " + t.getMessage());
 		} finally {
+			LOG.info("Shutting down all services");
+			if (broker1 != null) {
+				broker1.shutdown();
+			}
 			if (zookeeper != null) {
 				try {
 					zookeeper.stop();
@@ -104,10 +106,6 @@ public class KafkaITCase {
 					LOG.warn("ZK.stop() failed",e);
 				}
 			}
-			if (broker1 != null) {
-				broker1.shutdown();
-			}
-
 		}
 
 	}
@@ -118,9 +116,28 @@ public class KafkaITCase {
 	}
 
 	private void startKafkaTopology() throws Exception {
-		StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironment(1);
+		final StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironment(2);
 
-		// TODO use a consumer and a producer
+		// add consuming topology:
+		DataStreamSource<String> consuming = env.addSource(new PersistentKafkaSource<String>(kafkaHost + ":" + KAFKA_PORT, TOPIC, new JavaDefaultStringSchema()));
+		consuming.print();
+
+		// add producing topology
+		DataStream<String> stream = env.generateSequence(0, 100).map(new MapFunction<Long, String>() {
+			@Override
+			public String map(Long value) throws Exception {
+				return value + "-kafka-test";
+			}
+		});
+		stream.print();
+		stream.addSink(new KafkaSink<String>(kafkaHost+":"+KAFKA_PORT, TOPIC, new JavaDefaultStringSchema()));
+
+
+
+		env.execute();
+
+
+	/**	// TODO use a consumer and a producer
 		DataStream<String> consumer = env.addSource(new PersistentKafkaSource<String>(zookeeperConnectionString, TOPIC, new JavaDefaultStringSchema()))
 				.setParallelism(CONSUMER_PARALLELISM);
 		consumer.print();
@@ -157,7 +174,8 @@ public class KafkaITCase {
 				})
 				.addSink(new KafkaSink<String>(kafkaHost+":"+KAFKA_PORT, TOPIC, new JavaDefaultStringSchema()));
 
-		env.execute();
+		env.execute(); **/
+
 	}
 
 

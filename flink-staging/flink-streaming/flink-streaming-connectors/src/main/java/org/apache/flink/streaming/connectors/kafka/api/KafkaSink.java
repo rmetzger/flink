@@ -19,9 +19,10 @@ package org.apache.flink.streaming.connectors.kafka.api;
 
 import java.util.Properties;
 
+import com.google.common.base.Preconditions;
+import kafka.serializer.StringEncoder;
 import org.apache.flink.streaming.api.function.sink.RichSinkFunction;
 import org.apache.flink.streaming.connectors.kafka.config.EncoderWrapper;
-import org.apache.flink.streaming.connectors.kafka.config.PartitionerWrapper;
 import org.apache.flink.streaming.connectors.kafka.partitioner.KafkaDistributePartitioner;
 import org.apache.flink.streaming.connectors.kafka.partitioner.KafkaPartitioner;
 import org.apache.flink.streaming.connectors.util.SerializationSchema;
@@ -30,6 +31,7 @@ import kafka.javaapi.producer.Producer;
 import kafka.producer.KeyedMessage;
 import kafka.producer.ProducerConfig;
 import kafka.serializer.DefaultEncoder;
+import org.apache.flink.util.NetUtils;
 
 /**
  * Sink that emits its inputs to a Kafka topic.
@@ -79,6 +81,8 @@ public class KafkaSink<IN> extends RichSinkFunction<IN> {
 	 */
 	public KafkaSink(String brokerAddr, String topicId,
 			SerializationSchema<IN, byte[]> serializationSchema, KafkaPartitioner<IN> partitioner) {
+		NetUtils.ensureCorrectHostnamePort(brokerAddr);
+		Preconditions.checkNotNull(topicId, "TopicID not set");
 		this.topicId = topicId;
 		this.brokerAddr = brokerAddr;
 		this.scheme = serializationSchema;
@@ -96,8 +100,10 @@ public class KafkaSink<IN> extends RichSinkFunction<IN> {
 		props.put("request.required.acks", "1");
 
 		props.put("serializer.class", DefaultEncoder.class.getCanonicalName());
-		props.put("key.serializer.class", EncoderWrapper.class.getCanonicalName());
-		props.put("partitioner.class", PartitionerWrapper.class.getCanonicalName());
+		props.put("key.serializer.class", StringEncoder.class.getCanonicalName());
+
+		// it is using the default partitioner
+//		props.put("partitioner.class", KafkaDistributePartitioner.class.getCanonicalName());
 
 		//EncoderWrapper<IN> encoderWrapper = new EncoderWrapper<IN>(scheme);
 	//	encoderWrapper.write(props);
