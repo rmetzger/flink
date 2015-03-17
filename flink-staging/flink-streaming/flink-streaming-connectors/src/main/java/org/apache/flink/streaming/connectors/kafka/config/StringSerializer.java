@@ -47,7 +47,7 @@ public class StringSerializer<T extends Serializable> {
 		byte[] bytes = Base64.decodeBase64(stringSerialized);
 		ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
 		ClassLoaderAwareObjectInputStream claois = new ClassLoaderAwareObjectInputStream(bais, Thread.currentThread().getContextClassLoader() );
-		return SerializationUtils.deserialize(bytes);
+		return SerializationUtils.deserialize(claois);
 	}
 
 
