@@ -33,6 +33,8 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.connectors.ConnectorSource;
 import org.apache.flink.streaming.connectors.util.DeserializationSchema;
 import org.apache.flink.util.Collector;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Source that listens to a Kafka topic using the high level Kafka API.
@@ -41,7 +43,10 @@ import org.apache.flink.util.Collector;
  *            Type of the messages on the topic.
  */
 public class KafkaSource<OUT> extends ConnectorSource<OUT> {
+
 	private static final long serialVersionUID = 1L;
+
+	private static final Logger LOG = LoggerFactory.getLogger(KafkaSource.class);
 
 	private final String zookeeperHost;
 	private final String groupId;

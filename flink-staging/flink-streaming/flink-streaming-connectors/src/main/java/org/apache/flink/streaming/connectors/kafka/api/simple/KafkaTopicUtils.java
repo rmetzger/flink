@@ -24,6 +24,8 @@ import java.util.Properties;
 import org.I0Itec.zkclient.ZkClient;
 import org.I0Itec.zkclient.exception.ZkMarshallingError;
 import org.I0Itec.zkclient.serialize.ZkSerializer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import kafka.admin.AdminUtils;
 import kafka.api.PartitionMetadata;
@@ -38,13 +40,7 @@ import scala.collection.Seq;
  */
 public class KafkaTopicUtils {
 
-	public static void main(String[] args) {
-		KafkaTopicUtils kafkaTopicUtils = new KafkaTopicUtils("localhost:2181", 5000, 5000);
-//		TopicMetadata para4 = kafkaTopicUtils.getTopicInfo("para4");
-//		PartitionMetadata next = JavaConversions.asJavaCollection(para4.partitionsMetadata()).iterator().next();
-//		next.
-		System.out.println(kafkaTopicUtils.getLeaderBrokerAddressForTopic("para4"));
-	}
+	private static final Logger LOG = LoggerFactory.getLogger(KafkaTopicUtils.class);
 
 	private final ZkClient zkClient;
 
@@ -63,7 +59,13 @@ public class KafkaTopicUtils {
 
 	public void createTopic(String topicName, int numOfPartitions, int replicationFactor, Properties topicProperties) {
 		Properties topicConfig = new Properties();
-		AdminUtils.createTopic(zkClient, topicName, numOfPartitions, replicationFactor, topicConfig);
+		if (topicExists(topicName)) {
+			if (LOG.isWarnEnabled()) {
+				LOG.warn("Kafka topic \"{}\" already exists", topicName);
+			}
+		} else {
+			AdminUtils.createTopic(zkClient, topicName, numOfPartitions, replicationFactor, topicConfig);
+		}
 	}
 
 	public int getNumberOfPartitions(String topicName) {
