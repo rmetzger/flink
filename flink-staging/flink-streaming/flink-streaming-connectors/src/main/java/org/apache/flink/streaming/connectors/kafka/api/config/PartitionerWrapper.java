@@ -14,35 +14,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-package org.apache.flink.streaming.connectors.kafka.config;
-
-import org.apache.flink.streaming.connectors.kafka.partitioner.KafkaPartitioner;
+package org.apache.flink.streaming.connectors.kafka.api.config;
 
 import kafka.producer.Partitioner;
 import kafka.utils.VerifiableProperties;
 
 /**
- * Wraps an arbitrary partitioner to use as a Kafka partitioner.
- *
- * @param <T>
- * 		Type to partition
+ * Hacky wrapper to send an object instance through a Properties - map.
  */
-public class PartitionerWrapper<T> extends KafkaConfigWrapper<KafkaPartitioner<T>> implements Partitioner {
+public class PartitionerWrapper implements Partitioner {
+	public final static String SERIALIZED_WRAPPER_NAME = "flink.kafka.wrapper.serialized";
 
-	public PartitionerWrapper(KafkaPartitioner<T> wrapped) {
-	//	super(wrapped);
-	}
-
+	private Partitioner wrapped;
 	public PartitionerWrapper(VerifiableProperties properties) {
-	//	super(properties);
+		wrapped = (Partitioner) properties.props().get(SERIALIZED_WRAPPER_NAME);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public int partition(Object key, int numPartitions) {
-	//	return wrapped.partition((T) key, numPartitions);
-		return -1;
+	public int partition(Object value, int numberOfPartitions) {
+		return wrapped.partition(value, numberOfPartitions);
 	}
-
 }

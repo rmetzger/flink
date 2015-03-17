@@ -21,10 +21,8 @@ package org.apache.flink.streaming.connectors.kafka.partitioner;
  * Kafka partitioner that distributes the data equally by cycling through the output
  * channels.
  *
- * @param <T>
- *     Type to partition.
  */
-public class KafkaDistributePartitioner<T> implements KafkaPartitioner<T> {
+public class KafkaDistributePartitioner implements SerializableKafkaPartitioner {
 
 	private static final long serialVersionUID = 1L;
 	int currentPartition;
@@ -34,7 +32,7 @@ public class KafkaDistributePartitioner<T> implements KafkaPartitioner<T> {
 	}
 
 	@Override
-	public int partition(T value, int numberOfPartitions) {
+	public int partition(Object value, int numberOfPartitions) {
 		return currentPartition++ % numberOfPartitions;
 	}
 

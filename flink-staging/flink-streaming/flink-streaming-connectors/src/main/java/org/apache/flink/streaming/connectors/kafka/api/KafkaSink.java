@@ -21,10 +21,10 @@ import java.util.Properties;
 
 import com.google.common.base.Preconditions;
 import kafka.serializer.StringEncoder;
+import org.apache.flink.api.java.ClosureCleaner;
 import org.apache.flink.streaming.api.function.sink.RichSinkFunction;
-import org.apache.flink.streaming.connectors.kafka.config.EncoderWrapper;
-import org.apache.flink.streaming.connectors.kafka.partitioner.KafkaDistributePartitioner;
-import org.apache.flink.streaming.connectors.kafka.partitioner.KafkaPartitioner;
+import org.apache.flink.streaming.connectors.kafka.api.config.PartitionerWrapper;
+import org.apache.flink.streaming.connectors.kafka.partitioner.SerializableKafkaPartitioner;
 import org.apache.flink.streaming.connectors.util.SerializationSchema;
 
 import kafka.javaapi.producer.Producer;
@@ -41,14 +41,14 @@ import org.apache.flink.util.NetUtils;
  */
 public class KafkaSink<IN> extends RichSinkFunction<IN> {
 	private static final long serialVersionUID = 1L;
-
 	private Producer<IN, byte[]> producer;
 	private Properties props;
 	private String topicId;
 	private String brokerAddr;
 	private boolean initDone = false;
 	private SerializationSchema<IN, byte[]> scheme;
-	private KafkaPartitioner<IN> partitioner;
+	private SerializableKafkaPartitioner partitioner;
+	private Class<? extends SerializableKafkaPartitioner> partitionerClass = null;
 
 	/**
 	 * Creates a KafkaSink for a given topic. The partitioner distributes the
@@ -63,7 +63,7 @@ public class KafkaSink<IN> extends RichSinkFunction<IN> {
 	 */
 	public KafkaSink(String brokerAddr, String topicId,
 			SerializationSchema<IN, byte[]> serializationSchema) {
-		this(brokerAddr, topicId, serializationSchema, new KafkaDistributePartitioner<IN>());
+		this(brokerAddr, topicId, serializationSchema, (Class)null);
 	}
 
 	/**
@@ -80,13 +80,27 @@ public class KafkaSink<IN> extends RichSinkFunction<IN> {
 	 * 		User defined partitioner.
 	 */
 	public KafkaSink(String brokerAddr, String topicId,
-			SerializationSchema<IN, byte[]> serializationSchema, KafkaPartitioner<IN> partitioner) {
+			SerializationSchema<IN, byte[]> serializationSchema, SerializableKafkaPartitioner partitioner) {
 		NetUtils.ensureCorrectHostnamePort(brokerAddr);
 		Preconditions.checkNotNull(topicId, "TopicID not set");
+		ClosureCleaner.ensureSerializable(partitioner);
+
 		this.topicId = topicId;
 		this.brokerAddr = brokerAddr;
 		this.scheme = serializationSchema;
 		this.partitioner = partitioner;
+	}
+
+	public KafkaSink(String brokerAddr, String topicId,
+					 SerializationSchema<IN, byte[]> serializationSchema, Class<? extends SerializableKafkaPartitioner> partitioner) {
+		NetUtils.ensureCorrectHostnamePort(brokerAddr);
+		Preconditions.checkNotNull(topicId, "TopicID not set");
+		ClosureCleaner.ensureSerializable(partitioner);
+
+		this.topicId = topicId;
+		this.brokerAddr = brokerAddr;
+		this.scheme = serializationSchema;
+		this.partitionerClass = partitioner;
 	}
 
 	/**
@@ -102,6 +116,14 @@ public class KafkaSink<IN> extends RichSinkFunction<IN> {
 		props.put("serializer.class", DefaultEncoder.class.getCanonicalName());
 		props.put("key.serializer.class", StringEncoder.class.getCanonicalName());
 
+		if(partitioner != null) {
+			props.put("partitioner.class", PartitionerWrapper.class.getCanonicalName());
+			// java serialization will do the rest.
+			props.put(PartitionerWrapper.SERIALIZED_WRAPPER_NAME, partitioner);
+		}
+		if(partitionerClass != null) {
+			props.put("partitioner.class", partitionerClass);
+		}
 		// it is using the default partitioner
 //		props.put("partitioner.class", KafkaDistributePartitioner.class.getCanonicalName());
 

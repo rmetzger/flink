@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.BitSet;
 import java.util.Properties;
 
 import kafka.server.KafkaConfig;
@@ -38,6 +39,7 @@ import org.apache.flink.streaming.api.function.source.SourceFunction;
 import org.apache.flink.streaming.connectors.kafka.api.KafkaSink;
 import org.apache.flink.streaming.connectors.kafka.api.simple.KafkaTopicUtils;
 import org.apache.flink.streaming.connectors.kafka.api.simple.PersistentKafkaSource;
+import org.apache.flink.streaming.connectors.kafka.partitioner.KafkaDistributePartitioner;
 import org.apache.flink.streaming.connectors.util.JavaDefaultStringSchema;
 import org.apache.flink.util.Collector;
 import org.junit.Assert;
@@ -60,7 +62,6 @@ public class KafkaITCase {
 	private static final Logger LOG = LoggerFactory.getLogger(KafkaITCase.class);
 
 	private final String TOPIC = "myTopic";
-	private final int CONSUMER_PARALLELISM = 1;
 
 	private final int ZK_PORT = 6667;
 	private final int KAFKA_PORT = 6668;
@@ -121,36 +122,37 @@ public class KafkaITCase {
 	}
 
 	private void startKafkaTopology() throws Exception {
-		final StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironment(2);
+		final StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironment(1);
 
 		// add consuming topology:
 		DataStreamSource<String> consuming = env.addSource(new PersistentKafkaSource<String>(zookeeperConnectionString, TOPIC, new JavaDefaultStringSchema()));
 		consuming.addSink(new SinkFunction<String>() {
 			int elCnt = 0;
-			int next = -1;
+			int start = -1;
+			BitSet validator = new BitSet(101);
 			@Override
 			public void invoke(String value) throws Exception {
 				LOG.info("Got "+value);
 				String[] sp = value.split("-");
 				int v = Integer.parseInt(sp[1]);
-				if(next == -1) {
-					next = v + 1;
-				} else {
-					if(v != next) {
-						Assert.fail("expected next="+next+" but saw "+v+" in element "+value);
-					}
-					next++;
+				if(start == -1) {
+					start = v;
 				}
+				Assert.assertFalse("Received tuple twice", validator.get(v - start));
+				validator.set(v - start);
 				elCnt++;
 				if(elCnt == 100) {
+					// check if everything in the bitset is set to true
+					int nc;
+					if((nc = validator.nextClearBit(0)) != 100) {
+						throw new RuntimeException("The bitset was not set to 1 on all elements. Next clear:"+nc+" Set: "+validator);
+					}
 					throw new SuccessException();
 				}
-
 			}
 
 			@Override
 			public void cancel() {
-
 			}
 		});
 
@@ -175,15 +177,19 @@ public class KafkaITCase {
 				running = false;
 			}
 		});
-		stream.addSink(new KafkaSink<String>(kafkaHost+":"+KAFKA_PORT, TOPIC, new JavaDefaultStringSchema()));
+		stream.addSink(new KafkaSink<String>(kafkaHost+":"+KAFKA_PORT, TOPIC, new JavaDefaultStringSchema(), new KafkaDistributePartitioner()));
 
 		try {
+			env.setDegreeOfParallelism(1);
 			env.execute();
 		} catch(JobExecutionException good) {
-			if(good.getCause() instanceof SuccessException) {
-				LOG.info("Saw success exception. All good");
-			} else {
-				throw good;
+			Throwable t = good.getCause();
+			int limit = 0;
+			while( !(t instanceof SuccessException)) {
+				t = t.getCause();
+				if(limit++ == 20) {
+					throw good;
+				}
 			}
 		}
 	}
