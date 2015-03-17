@@ -31,17 +31,18 @@ import kafka.utils.VerifiableProperties;
 public class PartitionerWrapper<T> extends KafkaConfigWrapper<KafkaPartitioner<T>> implements Partitioner {
 
 	public PartitionerWrapper(KafkaPartitioner<T> wrapped) {
-		super(wrapped);
+	//	super(wrapped);
 	}
 
 	public PartitionerWrapper(VerifiableProperties properties) {
-		super(properties);
+	//	super(properties);
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
 	public int partition(Object key, int numPartitions) {
-		return wrapped.partition((T) key, numPartitions);
+	//	return wrapped.partition((T) key, numPartitions);
+		return -1;
 	}
 
 }

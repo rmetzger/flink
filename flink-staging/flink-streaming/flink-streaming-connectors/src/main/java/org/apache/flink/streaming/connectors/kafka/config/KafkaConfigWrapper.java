@@ -22,6 +22,7 @@ import java.io.Serializable;
 import java.util.Properties;
 
 import kafka.utils.VerifiableProperties;
+import org.apache.flink.util.InstantiationUtil;
 
 /**
  * Wraps an arbitrary Serializable (e.g. a Partitioner) object to use in Kafka, to shade the properties.
@@ -31,7 +32,7 @@ import kafka.utils.VerifiableProperties;
  */
 public abstract class KafkaConfigWrapper<T extends Serializable> {
 
-	private StringSerializer<T> stringSerializer;
+/*	private StringSerializer<T> stringSerializer;
 
 	protected T wrapped;
 
@@ -60,6 +61,6 @@ public abstract class KafkaConfigWrapper<T extends Serializable> {
 
 	public void write(Properties properties) {
 		properties.put(getClass().getCanonicalName(), stringSerializer.serialize(wrapped));
-	}
+	} */
 
 }

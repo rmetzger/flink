@@ -31,16 +31,17 @@ import kafka.utils.VerifiableProperties;
 public class EncoderWrapper<T> extends KafkaConfigWrapper<SerializationSchema<T, byte[]>> implements Encoder<T> {
 
 	public EncoderWrapper(SerializationSchema<T, byte[]> wrapped) {
-		super(wrapped);
+		//super(wrapped);
 	}
 
 	public EncoderWrapper(VerifiableProperties properties) {
-		super(properties);
+		//super(properties);
 	}
 
 	@Override
 	public byte[] toBytes(T element) {
-		return wrapped.serialize(element);
+	//	return wrapped.serialize(element);
+		return null;
 	}
 
 }

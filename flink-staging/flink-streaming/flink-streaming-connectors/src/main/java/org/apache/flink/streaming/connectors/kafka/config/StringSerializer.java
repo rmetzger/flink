@@ -28,7 +28,7 @@ import java.util.Map;
 
 import org.apache.commons.codec.binary.Base64;
 
-import org.apache.commons.lang3.SerializationUtils;
+import org.apache.flink.util.InstantiationUtil;
 
 /**
  * Serializer to serializer an arbitrary object to String.
@@ -38,16 +38,16 @@ import org.apache.commons.lang3.SerializationUtils;
  */
 public class StringSerializer<T extends Serializable> {
 
-	public String serialize(T element) {
-		byte[] serialized = SerializationUtils.serialize(element);
+	public String serialize(T element) throws IOException {
+		byte[] serialized = InstantiationUtil.serializeObject(element);
 		return Base64.encodeBase64String(serialized);
 	}
 
-	public T deserialize(String stringSerialized) throws IOException {
+	public T deserialize(String stringSerialized) throws Exception {
 		byte[] bytes = Base64.decodeBase64(stringSerialized);
-		ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
-		ClassLoaderAwareObjectInputStream claois = new ClassLoaderAwareObjectInputStream(bais, Thread.currentThread().getContextClassLoader() );
-		return SerializationUtils.deserialize(claois);
+		//ByteArrayInputStream bais = new ByteArrayInputStream(bytes);
+		//ClassLoaderAwareObjectInputStream claois = new ClassLoaderAwareObjectInputStream(bais, );
+		return (T) InstantiationUtil.deserializeObject(bytes, Thread.currentThread().getContextClassLoader());
 	}
 
 

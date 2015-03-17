@@ -99,11 +99,11 @@ public class KafkaSink<IN> extends RichSinkFunction<IN> {
 		props.put("key.serializer.class", EncoderWrapper.class.getCanonicalName());
 		props.put("partitioner.class", PartitionerWrapper.class.getCanonicalName());
 
-		EncoderWrapper<IN> encoderWrapper = new EncoderWrapper<IN>(scheme);
-		encoderWrapper.write(props);
+		//EncoderWrapper<IN> encoderWrapper = new EncoderWrapper<IN>(scheme);
+	//	encoderWrapper.write(props);
 
-		PartitionerWrapper<IN> partitionerWrapper = new PartitionerWrapper<IN>(partitioner);
-		partitionerWrapper.write(props);
+	//	PartitionerWrapper<IN> partitionerWrapper = new PartitionerWrapper<IN>(partitioner);
+	//	partitionerWrapper.write(props);
 
 		ProducerConfig config = new ProducerConfig(props);
 
