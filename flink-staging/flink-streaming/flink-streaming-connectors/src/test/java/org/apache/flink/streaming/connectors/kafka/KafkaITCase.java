@@ -19,9 +19,14 @@ package org.apache.flink.streaming.connectors.kafka;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.Properties;
 
-import org.apache.commons.io.FileUtils;
+import kafka.server.KafkaConfig;
+import kafka.server.KafkaServer;
+import kafka.utils.Time;
+import org.apache.curator.test.TestingServer;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -31,50 +36,65 @@ import org.apache.flink.streaming.connectors.kafka.api.simple.KafkaTopicUtils;
 import org.apache.flink.streaming.connectors.kafka.api.simple.PersistentKafkaSource;
 import org.apache.flink.streaming.connectors.util.JavaDefaultStringSchema;
 import org.apache.flink.util.Collector;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.github.sakserv.minicluster.config.ConfigVars;
-import com.github.sakserv.minicluster.config.PropertyParser;
-import com.github.sakserv.minicluster.impl.KafkaLocalBroker;
-import com.github.sakserv.minicluster.impl.ZookeeperLocalCluster;
+/**
+ * Code in this test is based on the following GitHub repository:
+ * (as per commit bc6b2b2d5f6424d5f377aa6c0871e82a956462ef)
+ *
+ * https://github.com/sakserv/hadoop-mini-clusters (ASL licensed)
+ */
 
-public class KafkaIT {
+public class KafkaITCase {
 
-	private static final Logger LOG = LoggerFactory.getLogger(KafkaIT.class);
+	private static final Logger LOG = LoggerFactory.getLogger(KafkaITCase.class);
 
 	private final String TOPIC = "myTopic";
 	private final int CONSUMER_PARALLELISM = 1;
 
-
+	private final int ZK_PORT = 6667;
+	private final int KAFKA_PORT = 6668;
+	private String kafkaHost;
 	private String zookeeperConnectionString;
-	private String kafkaBrokerHost;
+
+	@Rule
+	public TemporaryFolder tempFolder = new TemporaryFolder();
+
+	public File tmpZkDir;
+	public File tmpKafkaDir;
+	@Before
+	public void prepare() throws IOException {
+		tmpZkDir = tempFolder.newFolder();
+		tmpKafkaDir = tempFolder.newFolder();
+		kafkaHost = InetAddress.getLocalHost().getHostName();
+		zookeeperConnectionString = "localhost:"+ZK_PORT;
+	}
+
 
 	@Test
 	public void test() {
-		ZookeeperLocalCluster zookeeper = zookeeper();
-		KafkaLocalBroker broker1 = kafkaBroker(0);
-
-		zookeeperConnectionString = zookeeper.getZookeeperConnectionString();
-		kafkaBrokerHost = broker1.getKafkaHostname() + ":" + broker1.getKafkaPort();
-
-		zookeeper.start();
-		broker1.start();
-
-		createTestTopic();
-
-		startKafkaTopology();
-
-		broker1.stop();
-		zookeeper.stop();
-
+		LOG.info("Starting KafkaITCase.test()");
 		try {
-			FileUtils.deleteDirectory(new File(zookeeper.getTempDir()));
-			FileUtils.deleteDirectory(new File(broker1.getKafkaTempDir()));
-		} catch (IOException e) {
-			e.printStackTrace();
+			TestingServer zookeeper = getZookeper();
+			KafkaServer broker1 = getKafkaServer(0);
+
+			createTestTopic();
+
+			startKafkaTopology();
+
+			broker1.shutdown();
+			zookeeper.stop();
+		} catch(Exception t) {
+			LOG.warn("Test failed with exception", t);
+			Assert.fail("Test failed with: " + t.getMessage());
 		}
+
 	}
 
 	private void createTestTopic() {
@@ -82,7 +102,7 @@ public class KafkaIT {
 		kafkaTopicUtils.createTopic(TOPIC, 1, 1);
 	}
 
-	private void startKafkaTopology() {
+	private void startKafkaTopology() throws Exception {
 		StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironment(1);
 
 		// TODO use a consumer and a producer
@@ -120,55 +140,53 @@ public class KafkaIT {
 					}
 
 				})
-				.addSink(new KafkaSink<String>(kafkaBrokerHost, TOPIC, new JavaDefaultStringSchema()));
+				.addSink(new KafkaSink<String>(kafkaHost+":"+KAFKA_PORT, TOPIC, new JavaDefaultStringSchema()));
 
-		try {
-			env.execute();
-		} catch (Exception e) {
-			e.printStackTrace();
+		env.execute();
+	}
+
+
+	private TestingServer getZookeper() throws Exception {
+		return new TestingServer(ZK_PORT, tmpZkDir);
+	}
+
+	/**
+	 * Copied from com.github.sakserv.minicluster.KafkaLocalBrokerIntegrationTest (ASL licensed)
+	 */
+	private KafkaServer getKafkaServer(int brokerId) throws UnknownHostException {
+		Properties kafkaProperties = new Properties();
+		// properties have to be Strings
+		kafkaProperties.put("advertised.host.name", kafkaHost);
+		kafkaProperties.put("port", Integer.toString(KAFKA_PORT));
+		kafkaProperties.put("broker.id", Integer.toString(brokerId));
+		kafkaProperties.put("log.dir", tmpKafkaDir.toString());
+		kafkaProperties.put("enable.zookeeper", "true");
+		kafkaProperties.put("zookeeper.connect", "localhost:"+ZK_PORT);
+		KafkaConfig kafkaConfig = new KafkaConfig(kafkaProperties);
+
+		return new KafkaServer(kafkaConfig, new LocalSystemTime());
+	}
+
+	public class LocalSystemTime implements Time {
+
+		@Override
+		public long milliseconds() {
+			return System.currentTimeMillis();
 		}
-	}
 
-
-	/**
-	 * Copied from com.github.sakserv.minicluster.KafkaLocalBrokerIntegrationTest (ASL licensed)
-	 */
-	// Setup the property parser
-	private static PropertyParser propertyParser;
-
-	static {
-		try {
-			propertyParser = new PropertyParser(ConfigVars.DEFAULT_PROPS_FILE);
-		} catch (IOException e) {
-			LOG.error("Unable to load property file: " + propertyParser.getProperty(ConfigVars.DEFAULT_PROPS_FILE));
+		public long nanoseconds() {
+			return System.nanoTime();
 		}
-	}
 
-	/**
-	 * Copied from com.github.sakserv.minicluster.KafkaLocalBrokerIntegrationTest (ASL licensed)
-	 */
-	private ZookeeperLocalCluster zookeeper() {
-		ZookeeperLocalCluster zookeeperLocalCluster = new ZookeeperLocalCluster.Builder()
-				.setPort(Integer.parseInt(propertyParser.getProperty(ConfigVars.ZOOKEEPER_PORT_KEY)))
-				.setTempDir(propertyParser.getProperty(ConfigVars.ZOOKEEPER_TEMP_DIR_KEY))
-				.setZookeeperConnectionString(propertyParser.getProperty(ConfigVars.ZOOKEEPER_CONNECTION_STRING_KEY))
-				.build();
-		return zookeeperLocalCluster;
-	}
+		@Override
+		public void sleep(long ms) {
+			try {
+				Thread.sleep(ms);
+			} catch (InterruptedException e) {
+				LOG.warn("Interruption", e);
+			}
+		}
 
-	/**
-	 * Copied from com.github.sakserv.minicluster.KafkaLocalBrokerIntegrationTest (ASL licensed)
-	 */
-	private KafkaLocalBroker kafkaBroker(int brokerId) {
-		KafkaLocalBroker kafkaLocalBroker = new KafkaLocalBroker.Builder()
-				.setKafkaHostname(propertyParser.getProperty(ConfigVars.KAFKA_HOSTNAME_KEY))
-				.setKafkaPort(Integer.parseInt(propertyParser.getProperty(ConfigVars.KAFKA_PORT_KEY)))
-				.setKafkaBrokerId(brokerId)
-				.setKafkaProperties(new Properties())
-				.setKafkaTempDir(propertyParser.getProperty(ConfigVars.KAFKA_TEST_TEMP_DIR_KEY))
-				.setZookeeperConnectionString(propertyParser.getProperty(ConfigVars.ZOOKEEPER_CONNECTION_STRING_KEY))
-				.build();
-		return kafkaLocalBroker;
 	}
 
 }

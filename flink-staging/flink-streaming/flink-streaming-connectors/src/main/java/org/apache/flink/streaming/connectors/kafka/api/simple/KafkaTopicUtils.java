@@ -54,14 +54,11 @@ public class KafkaTopicUtils {
 	}
 
 	public void createTopic(String topicName, int numOfPartitions, int replicationFactor) {
-		createTopic(topicName, numOfPartitions, replicationFactor, new Properties());
-	}
-
-	public void createTopic(String topicName, int numOfPartitions, int replicationFactor, Properties topicProperties) {
+		LOG.info("Creating Kafka topic '{}'", topicName);
 		Properties topicConfig = new Properties();
 		if (topicExists(topicName)) {
 			if (LOG.isWarnEnabled()) {
-				LOG.warn("Kafka topic \"{}\" already exists", topicName);
+				LOG.warn("Kafka topic \"{}\" already exists. Returning without action.", topicName);
 			}
 		} else {
 			AdminUtils.createTopic(zkClient, topicName, numOfPartitions, replicationFactor, topicConfig);
