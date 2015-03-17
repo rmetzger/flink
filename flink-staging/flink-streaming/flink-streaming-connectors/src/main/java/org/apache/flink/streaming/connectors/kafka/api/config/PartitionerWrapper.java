@@ -21,6 +21,18 @@ import kafka.utils.VerifiableProperties;
 
 /**
  * Hacky wrapper to send an object instance through a Properties - map.
+ *
+ * This works as follows:
+ * The recommended way of creating a KafkaSink is specifying a classname for the partitioner.
+ *
+ * Otherwise (if the user gave a (serializable) class instance), we give Kafka the PartitionerWrapper class of Flink.
+ * This is set in the key-value (java.util.Properties) map.
+ * In addition to that, we use the Properties.put(Object, Object) to store the instance of the (serializable).
+ * This is a hack because the put() method is called on the underlying Hashmap.
+ *
+ * This PartitionerWrapper is called with the Properties. From there, we extract the wrapped Partitioner instance.
+ *
+ * The serialziable PartitionerWrapper is serialized into the Properties Hashmap and also deserialized from there.
  */
 public class PartitionerWrapper implements Partitioner {
 	public final static String SERIALIZED_WRAPPER_NAME = "flink.kafka.wrapper.serialized";

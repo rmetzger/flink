@@ -124,14 +124,6 @@ public class KafkaSink<IN> extends RichSinkFunction<IN> {
 		if(partitionerClass != null) {
 			props.put("partitioner.class", partitionerClass);
 		}
-		// it is using the default partitioner
-//		props.put("partitioner.class", KafkaDistributePartitioner.class.getCanonicalName());
-
-		//EncoderWrapper<IN> encoderWrapper = new EncoderWrapper<IN>(scheme);
-	//	encoderWrapper.write(props);
-
-	//	PartitionerWrapper<IN> partitionerWrapper = new PartitionerWrapper<IN>(partitioner);
-	//	partitionerWrapper.write(props);
 
 		ProducerConfig config = new ProducerConfig(props);
 
