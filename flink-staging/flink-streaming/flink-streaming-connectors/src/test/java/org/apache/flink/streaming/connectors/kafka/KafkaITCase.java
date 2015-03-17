@@ -27,14 +27,19 @@ import kafka.server.KafkaConfig;
 import kafka.server.KafkaServer;
 import kafka.utils.Time;
 import org.apache.curator.test.TestingServer;
+import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.runtime.client.JobExecutionException;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.function.sink.SinkFunction;
+import org.apache.flink.streaming.api.function.source.SourceFunction;
 import org.apache.flink.streaming.connectors.kafka.api.KafkaSink;
 import org.apache.flink.streaming.connectors.kafka.api.simple.KafkaTopicUtils;
 import org.apache.flink.streaming.connectors.kafka.api.simple.PersistentKafkaSource;
 import org.apache.flink.streaming.connectors.util.JavaDefaultStringSchema;
+import org.apache.flink.util.Collector;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -82,7 +87,7 @@ public class KafkaITCase {
 		TestingServer zookeeper = null;
 		KafkaServer broker1 = null;
 		try {
-			zookeeper = getZookeper();
+			zookeeper = getZookeeper();
 			broker1 = getKafkaServer(0);
 			LOG.info("ZK and KafkaServer started. Creating test topic:");
 			createTestTopic();
@@ -119,67 +124,72 @@ public class KafkaITCase {
 		final StreamExecutionEnvironment env = StreamExecutionEnvironment.createLocalEnvironment(2);
 
 		// add consuming topology:
-		DataStreamSource<String> consuming = env.addSource(new PersistentKafkaSource<String>(kafkaHost + ":" + KAFKA_PORT, TOPIC, new JavaDefaultStringSchema()));
-		consuming.print();
-
-		// add producing topology
-		DataStream<String> stream = env.generateSequence(0, 100).map(new MapFunction<Long, String>() {
+		DataStreamSource<String> consuming = env.addSource(new PersistentKafkaSource<String>(zookeeperConnectionString, TOPIC, new JavaDefaultStringSchema()));
+		consuming.addSink(new SinkFunction<String>() {
+			int elCnt = 0;
+			int next = -1;
 			@Override
-			public String map(Long value) throws Exception {
-				return value + "-kafka-test";
+			public void invoke(String value) throws Exception {
+				LOG.info("Got "+value);
+				String[] sp = value.split("-");
+				int v = Integer.parseInt(sp[1]);
+				if(next == -1) {
+					next = v + 1;
+				} else {
+					if(v != next) {
+						Assert.fail("expected next="+next+" but saw "+v+" in element "+value);
+					}
+					next++;
+				}
+				elCnt++;
+				if(elCnt == 100) {
+					throw new SuccessException();
+				}
+
+			}
+
+			@Override
+			public void cancel() {
+
 			}
 		});
-		stream.print();
+
+		// add producing topology
+		DataStream<String> stream = env.addSource(new SourceFunction<String>() {
+			boolean running = true;
+			@Override
+			public void run(Collector<String> collector) throws Exception {
+				LOG.info("Starting source.");
+				int cnt = 0;
+				while(running) {
+					collector.collect("kafka-" + cnt++);
+					try {
+						Thread.sleep(100);
+					} catch(InterruptedException ignored) {}
+				}
+			}
+
+			@Override
+			public void cancel() {
+				LOG.info("Source got chancel()");
+				running = false;
+			}
+		});
 		stream.addSink(new KafkaSink<String>(kafkaHost+":"+KAFKA_PORT, TOPIC, new JavaDefaultStringSchema()));
 
-
-
-		env.execute();
-
-
-	/**	// TODO use a consumer and a producer
-		DataStream<String> consumer = env.addSource(new PersistentKafkaSource<String>(zookeeperConnectionString, TOPIC, new JavaDefaultStringSchema()))
-				.setParallelism(CONSUMER_PARALLELISM);
-		consumer.print();
-
-		env.fromElements(1).connect(consumer)
-				.flatMap(new RichCoFlatMapFunction<Integer, String, String>() {
-					boolean gotMessage;
-
-					@Override
-					public void open(Configuration configuration) {
-						gotMessage = false;
-					}
-
-					@Override
-					public void flatMap1(Integer s, Collector<String> collector) throws Exception {
-						// wait for consumer
-						while (!gotMessage) {
-							collector.collect("msg");
-							Thread.sleep(10);
-						}
-
-						// if done, close consumer using schemas end of stream checking
-						for (int i = 0; i < CONSUMER_PARALLELISM; i++) {
-							collector.collect("q");
-						}
-					}
-
-					@Override
-					public void flatMap2(String s, Collector<String> collector) throws Exception {
-						// if this is received, the consumer started processing messages
-						gotMessage = true;
-					}
-
-				})
-				.addSink(new KafkaSink<String>(kafkaHost+":"+KAFKA_PORT, TOPIC, new JavaDefaultStringSchema()));
-
-		env.execute(); **/
-
+		try {
+			env.execute();
+		} catch(JobExecutionException good) {
+			if(good.getCause() instanceof SuccessException) {
+				LOG.info("Saw success exception. All good");
+			} else {
+				throw good;
+			}
+		}
 	}
 
 
-	private TestingServer getZookeper() throws Exception {
+	private TestingServer getZookeeper() throws Exception {
 		return new TestingServer(ZK_PORT, tmpZkDir);
 	}
 
@@ -220,6 +230,10 @@ public class KafkaITCase {
 				LOG.warn("Interruption", e);
 			}
 		}
+
+	}
+
+	public static class SuccessException extends Exception {
 
 	}
 

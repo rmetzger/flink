@@ -182,7 +182,6 @@ public abstract class DataSet<T> {
 		if (getExecutionEnvironment().getConfig().isClosureCleanerEnabled()) {
 			ClosureCleaner.clean(f, true);
 		}
-		ClosureCleaner.ensureSerializable(f);
 		return f;
 	}
 
