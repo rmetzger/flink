@@ -71,6 +71,7 @@ public class KafkaMultiplePartitionsIterator implements KafkaConsumerIterator {
 	}
 
 	protected int lastCheckedPartitionIndex = -1;
+	private boolean gotNewMessage = false;
 
 	@Override
 	public MessageWithMetadata nextWithOffset() throws InterruptedException {
@@ -81,16 +82,22 @@ public class KafkaMultiplePartitionsIterator implements KafkaConsumerIterator {
 				partition = partitions.get(i);
 
 				if (partition.fetchHasNext()) {
+					gotNewMessage = true;
 					lastCheckedPartitionIndex = i;
 					return partition.nextWithOffset();
 				}
 			}
 
-			try {
-				Thread.sleep(waitOnEmptyFetch);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
+			// do not wait if a new message has been fetched
+			if (!gotNewMessage) {
+				try {
+					Thread.sleep(waitOnEmptyFetch);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
 			}
+
+			gotNewMessage = false;
 		}
 	}
 
