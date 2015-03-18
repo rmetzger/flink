@@ -26,6 +26,8 @@ import java.util.Map;
 /**
  * A StateHandle that includes a copy of the state itself. This state handle is recommended for 
  * cases where the operatorState is lightweight enough to pass throughout the network.
+ *
+ * State is kept in a byte[] because it may contain userclasses, which akka is not able to handle.
  */
 public class LocalStateHandle implements StateHandle{
 	

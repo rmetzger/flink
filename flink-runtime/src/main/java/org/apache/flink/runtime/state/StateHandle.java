@@ -19,7 +19,6 @@
 package org.apache.flink.runtime.state;
 
 
-import java.io.IOException;
 import java.io.Serializable;
 import java.util.Map;
 
