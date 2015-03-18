@@ -92,7 +92,7 @@ public class KafkaSink<IN> extends RichSinkFunction<IN> {
 	}
 
 	public KafkaSink(String brokerAddr, String topicId,
-					 SerializationSchema<IN, byte[]> serializationSchema, Class<? extends SerializableKafkaPartitioner> partitioner) {
+					SerializationSchema<IN, byte[]> serializationSchema, Class<? extends SerializableKafkaPartitioner> partitioner) {
 		NetUtils.ensureCorrectHostnamePort(brokerAddr);
 		Preconditions.checkNotNull(topicId, "TopicID not set");
 		ClosureCleaner.ensureSerializable(partitioner);
