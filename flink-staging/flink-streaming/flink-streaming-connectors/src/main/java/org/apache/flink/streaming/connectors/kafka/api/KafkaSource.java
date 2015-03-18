@@ -48,7 +48,7 @@ public class KafkaSource<OUT> extends ConnectorSource<OUT> {
 
 	private static final Logger LOG = LoggerFactory.getLogger(KafkaSource.class);
 
-	private final String zookeeperHost;
+	private final String zookeeperAddress;
 	private final String groupId;
 	private final String topicId;
 
@@ -64,7 +64,7 @@ public class KafkaSource<OUT> extends ConnectorSource<OUT> {
 	/**
 	 * Creates a KafkaSource that consumes a topic.
 	 * 
-	 * @param zookeeperHost
+	 * @param zookeeperAddress
 	 *            Address of the Zookeeper host (with port number).
 	 * @param topicId
 	 *            ID of the Kafka topic.
@@ -73,24 +73,24 @@ public class KafkaSource<OUT> extends ConnectorSource<OUT> {
 	 * @param zookeeperSyncTimeMillis
 	 *            Synchronization time with zookeeper.
 	 */
-	public KafkaSource(String zookeeperHost, String topicId, String groupId,
+	public KafkaSource(String zookeeperAddress, String topicId, String groupId,
 			DeserializationSchema<OUT> deserializationSchema, long zookeeperSyncTimeMillis) {
 		super(deserializationSchema);
-		this.zookeeperHost = zookeeperHost;
+		this.zookeeperAddress = zookeeperAddress;
 		this.groupId = groupId;
 		this.topicId = topicId;
 		this.zookeeperSyncTimeMillis = zookeeperSyncTimeMillis;
 	}
 
-	public KafkaSource(String zookeeperHost, String topicId,
+	public KafkaSource(String zookeeperAddress, String topicId,
 			DeserializationSchema<OUT> deserializationSchema, long zookeeperSyncTimeMillis) {
-		this(zookeeperHost, topicId, DEFAULT_GROUP_ID, deserializationSchema,
+		this(zookeeperAddress, topicId, DEFAULT_GROUP_ID, deserializationSchema,
 				ZOOKEEPER_DEFAULT_SYNC_TIME);
 	}
 
-	public KafkaSource(String zookeeperHost, String topicId,
+	public KafkaSource(String zookeeperAddress, String topicId,
 			DeserializationSchema<OUT> deserializationSchema) {
-		this(zookeeperHost, topicId, deserializationSchema, ZOOKEEPER_DEFAULT_SYNC_TIME);
+		this(zookeeperAddress, topicId, deserializationSchema, ZOOKEEPER_DEFAULT_SYNC_TIME);
 	}
 
 	/**
@@ -98,7 +98,7 @@ public class KafkaSource<OUT> extends ConnectorSource<OUT> {
 	 */
 	private void initializeConnection() {
 		Properties props = new Properties();
-		props.put("zookeeper.connect", zookeeperHost);
+		props.put("zookeeper.connect", zookeeperAddress);
 		props.put("group.id", groupId);
 		props.put("zookeeper.session.timeout.ms", "10000");
 		props.put("zookeeper.sync.time.ms", Long.toString(zookeeperSyncTimeMillis));

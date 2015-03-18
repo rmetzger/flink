@@ -59,22 +59,22 @@ public class PersistentKafkaSource<OUT> extends SimpleKafkaSource<OUT> {
 	/**
 	 * Creates a persistent Kafka source that consumes a topic.
 	 *
-	 * @param zookeeperHost
+	 * @param zookeeperAddress
 	 * 		Address of the Zookeeper host (with port number).
 	 * @param topicId
 	 * 		ID of the Kafka topic.
 	 * @param deserializationSchema
 	 * 		User defined deserialization schema.
 	 */
-	public PersistentKafkaSource(String zookeeperHost, String topicId,
+	public PersistentKafkaSource(String zookeeperAddress, String topicId,
 			DeserializationSchema<OUT> deserializationSchema) {
-		this(zookeeperHost, topicId, deserializationSchema, 5000, 500);
+		this(zookeeperAddress, topicId, deserializationSchema, KafkaTopicUtils.DEFAULT_ZOOKEEPER_CONNECTION_TIMEOUT_MS, 500);
 	}
 
 	/**
 	 * Creates a persistent Kafka source that consumes a topic.
 	 *
-	 * @param zookeeperHost
+	 * @param zookeeperAddress
 	 * 		Address of the Zookeeper host (with port number).
 	 * @param topicId
 	 * 		ID of the Kafka topic.
@@ -85,9 +85,9 @@ public class PersistentKafkaSource<OUT> extends SimpleKafkaSource<OUT> {
 	 * @param waitOnEmptyFetchMillis
 	 * 		Time to wait before fetching for new message.
 	 */
-	public PersistentKafkaSource(String zookeeperHost, String topicId,
+	public PersistentKafkaSource(String zookeeperAddress, String topicId,
 			DeserializationSchema<OUT> deserializationSchema, int zookeeperSyncTimeMillis, int waitOnEmptyFetchMillis) {
-		super(topicId, zookeeperHost, deserializationSchema);
+		super(topicId, zookeeperAddress, deserializationSchema);
 		this.zookeeperSyncTimeMillis = zookeeperSyncTimeMillis;
 		this.waitOnEmptyFetchMillis = waitOnEmptyFetchMillis;
 	}

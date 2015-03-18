@@ -44,12 +44,15 @@ public class KafkaTopicUtils {
 
 	private final ZkClient zkClient;
 
+	public static final int DEFAULT_ZOOKEEPER_SESSION_TIMEOUT_MS = 10000;
+	public static final int DEFAULT_ZOOKEEPER_CONNECTION_TIMEOUT_MS = 10000;
+
 	public KafkaTopicUtils(String zookeeperServer) {
-		this(zookeeperServer, 10000, 10000);
+		this(zookeeperServer, DEFAULT_ZOOKEEPER_SESSION_TIMEOUT_MS, DEFAULT_ZOOKEEPER_CONNECTION_TIMEOUT_MS);
 	}
 
-	public KafkaTopicUtils(String zookeeperServer, int sessionTimeoutMs, int connectionTimeoutMs) {
-		zkClient = new ZkClient(zookeeperServer, sessionTimeoutMs, connectionTimeoutMs,
+	public KafkaTopicUtils(String zookeeperAddress, int sessionTimeoutMs, int connectionTimeoutMs) {
+		zkClient = new ZkClient(zookeeperAddress, sessionTimeoutMs, connectionTimeoutMs,
 				new KafkaZKStringSerializer());
 		zkClient.waitUntilConnected();
 	}
