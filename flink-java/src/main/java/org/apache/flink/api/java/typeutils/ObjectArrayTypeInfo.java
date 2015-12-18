@@ -20,12 +20,15 @@ package org.apache.flink.api.java.typeutils;
 
 import java.lang.reflect.Array;
 
-import com.google.common.base.Preconditions;
+import org.apache.flink.annotation.PublicInterface;
 import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.common.typeutils.base.GenericArraySerializer;
 
+import com.google.common.base.Preconditions;
+
+@PublicInterface
 public class ObjectArrayTypeInfo<T, C> extends TypeInformation<T> {
 
 	private static final long serialVersionUID = 1L;

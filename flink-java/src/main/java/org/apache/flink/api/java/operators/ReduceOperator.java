@@ -18,6 +18,7 @@
 
 package org.apache.flink.api.java.operators;
 
+import org.apache.flink.annotation.PublicInterface;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.common.operators.Operator;
@@ -42,6 +43,7 @@ import org.apache.flink.api.java.DataSet;
  * 
  * @see org.apache.flink.api.common.functions.ReduceFunction
  */
+@PublicInterface
 public class ReduceOperator<IN> extends SingleInputUdfOperator<IN, IN, ReduceOperator<IN>> {
 	
 	private final ReduceFunction<IN> function;

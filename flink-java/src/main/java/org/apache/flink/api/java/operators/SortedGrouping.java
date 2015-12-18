@@ -18,19 +18,19 @@
 
 package org.apache.flink.api.java.operators;
 
+import java.util.Arrays;
+
+import org.apache.flink.annotation.PublicInterface;
 import org.apache.flink.api.common.functions.GroupCombineFunction;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.CompositeType;
-import org.apache.flink.api.java.Utils;
-import org.apache.flink.api.java.functions.FirstReducer;
-
-import java.util.Arrays;
-
 import org.apache.flink.api.common.InvalidProgramException;
 import org.apache.flink.api.common.functions.GroupReduceFunction;
 import org.apache.flink.api.common.functions.Partitioner;
 import org.apache.flink.api.common.operators.Order;
 import org.apache.flink.api.java.DataSet;
+import org.apache.flink.api.java.Utils;
+import org.apache.flink.api.java.functions.FirstReducer;
 import org.apache.flink.api.java.operators.Keys.ExpressionKeys;
 import org.apache.flink.api.java.typeutils.TupleTypeInfoBase;
 import org.apache.flink.api.java.typeutils.TypeExtractor;
@@ -46,6 +46,7 @@ import com.google.common.base.Preconditions;
  * 
  * @param <T> The type of the elements of the sorted and grouped DataSet.
  */
+@PublicInterface
 public class SortedGrouping<T> extends Grouping<T> {
 	
 	private int[] groupSortKeyPositions;

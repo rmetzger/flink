@@ -25,6 +25,7 @@ import java.util.List;
 
 import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.flink.annotation.PublicInterface;
 import org.apache.flink.api.common.InvalidProgramException;
 import org.apache.flink.api.common.functions.CoGroupFunction;
 import org.apache.flink.api.common.functions.MapFunction;
@@ -64,6 +65,7 @@ import org.apache.flink.api.java.typeutils.TypeExtractor;
  * 
  * @see DataSet
  */
+@PublicInterface
 public class CoGroupOperator<I1, I2, OUT> extends TwoInputUdfOperator<I1, I2, OUT, CoGroupOperator<I1, I2, OUT>> {
 
 	private final CoGroupFunction<I1, I2, OUT> function;

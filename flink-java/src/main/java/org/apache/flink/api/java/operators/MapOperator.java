@@ -18,7 +18,7 @@
 
 package org.apache.flink.api.java.operators;
 
-
+import org.apache.flink.annotation.PublicInterface;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.operators.Operator;
 import org.apache.flink.api.common.operators.UnaryOperatorInformation;
@@ -35,6 +35,7 @@ import org.apache.flink.api.java.DataSet;
  * 
  * @see org.apache.flink.api.common.functions.MapFunction
  */
+@PublicInterface
 public class MapOperator<IN, OUT> extends SingleInputUdfOperator<IN, OUT, MapOperator<IN, OUT>> {
 	
 	protected final MapFunction<IN, OUT> function;

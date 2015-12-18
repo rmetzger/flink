@@ -26,6 +26,7 @@ import java.lang.annotation.Retention;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.apache.flink.annotation.PublicInterface;
 import org.apache.flink.api.common.InvalidProgramException;
 
 /**
@@ -76,6 +77,7 @@ import org.apache.flink.api.common.InvalidProgramException;
  * </b>
  *
  */
+@PublicInterface
 public class FunctionAnnotation {
 
 	/**
