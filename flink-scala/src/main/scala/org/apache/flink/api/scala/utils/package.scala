@@ -18,7 +18,7 @@
 
 package org.apache.flink.api.scala
 
-import org.apache.flink.annotation.PublicInterface
+import org.apache.flink.annotation.PublicExperimental
 import org.apache.flink.api.common.typeinfo.{BasicTypeInfo, TypeInformation}
 import org.apache.flink.api.java.Utils
 import org.apache.flink.api.java.utils.{DataSetUtils => jutils}
@@ -35,7 +35,7 @@ package object utils {
    *
    * @param self Data Set
    */
-  @PublicInterface
+  @PublicExperimental
   implicit class DataSetUtils[T: TypeInformation : ClassTag](val self: DataSet[T]) {
 
     /**

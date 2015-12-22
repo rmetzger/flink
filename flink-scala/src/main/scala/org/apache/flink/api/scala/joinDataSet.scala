@@ -263,6 +263,7 @@ private[flink] abstract class UnfinishedJoinOperationBase[L, R, O <: JoinFunctio
  * @tparam L The type of the left input of the join.
  * @tparam R The type of the right input of the join.
  */
+@PublicInterface
 class UnfinishedJoinOperation[L, R](
     leftSet: DataSet[L],
     rightSet: DataSet[R],
@@ -294,6 +295,7 @@ class UnfinishedJoinOperation[L, R](
  * @tparam L The type of the left input of the join.
  * @tparam R The type of the right input of the join.
  */
+@PublicInterface
 class UnfinishedOuterJoinOperation[L, R](
     leftSet: DataSet[L],
     rightSet: DataSet[R],
@@ -328,6 +330,7 @@ class UnfinishedOuterJoinOperation[L, R](
 
 }
 
+@PublicInterface
 trait JoinFunctionAssigner[L, R] {
 
   def withPartitioner[K : TypeInformation](part : Partitioner[K]) : JoinFunctionAssigner[L, R]
