@@ -20,6 +20,7 @@ package org.apache.flink.api.java.operators;
 
 import java.util.Arrays;
 
+import org.apache.flink.annotation.PublicInterface;
 import org.apache.flink.api.common.InvalidProgramException;
 import org.apache.flink.api.common.aggregators.Aggregator;
 import org.apache.flink.api.common.aggregators.AggregatorRegistry;
@@ -39,6 +40,7 @@ import com.google.common.base.Preconditions;
  * @see DataSet#iterateDelta(DataSet, int, int...)
  * @see DataSet#iterateDelta(DataSet, int, int[])
  */
+@PublicInterface
 public class DeltaIteration<ST, WT> {
 	
 	private final AggregatorRegistry aggregators = new AggregatorRegistry();

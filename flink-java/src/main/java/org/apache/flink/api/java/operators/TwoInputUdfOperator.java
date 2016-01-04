@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.flink.annotation.PublicInterface;
 import org.apache.flink.api.common.functions.Function;
 import org.apache.flink.api.common.functions.InvalidTypesException;
 import org.apache.flink.api.common.operators.DualInputSemanticProperties;
@@ -49,6 +50,7 @@ import org.apache.flink.configuration.Configuration;
  * @param <IN2> The data type of the second input data set.
  * @param <OUT> The data type of the returned data set.
  */
+@PublicInterface
 public abstract class TwoInputUdfOperator<IN1, IN2, OUT, O extends TwoInputUdfOperator<IN1, IN2, OUT, O>>
 	extends TwoInputOperator<IN1, IN2, OUT, O> implements UdfOperator<O>
 {

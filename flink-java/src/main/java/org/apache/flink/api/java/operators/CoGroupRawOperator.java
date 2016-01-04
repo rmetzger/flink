@@ -17,6 +17,7 @@
  */
 package org.apache.flink.api.java.operators;
 
+import org.apache.flink.annotation.PublicInterface;
 import org.apache.flink.api.common.InvalidProgramException;
 import org.apache.flink.api.common.functions.CoGroupFunction;
 import org.apache.flink.api.common.functions.Function;
@@ -36,6 +37,7 @@ import org.apache.flink.api.java.operators.Keys.IncompatibleKeysException;
  * 
  * @see DataSet
  */
+@PublicInterface
 public class CoGroupRawOperator<I1, I2, OUT> extends TwoInputUdfOperator<I1, I2, OUT, CoGroupRawOperator<I1, I2, OUT>> {
 
 	private final CoGroupFunction<I1, I2, OUT> function;

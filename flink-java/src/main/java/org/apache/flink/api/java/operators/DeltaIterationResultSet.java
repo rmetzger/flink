@@ -18,10 +18,12 @@
 
 package org.apache.flink.api.java.operators;
 
+import org.apache.flink.annotation.PublicInterface;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 
+@PublicInterface
 public class DeltaIterationResultSet<ST, WT> extends DataSet<ST> {
 
 	private DeltaIteration<ST, WT> iterationHead;

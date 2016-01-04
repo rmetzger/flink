@@ -18,6 +18,7 @@
 
 package org.apache.flink.api.java.operators;
 
+import org.apache.flink.annotation.PublicInterface;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.Partitioner;
 import org.apache.flink.api.common.operators.Operator;
@@ -40,6 +41,7 @@ import com.google.common.base.Preconditions;
  *
  * @param <T> The type of the data being partitioned.
  */
+@PublicInterface
 public class PartitionOperator<T> extends SingleInputOperator<T, T, PartitionOperator<T>> {
 	
 	private final Keys<T> pKeys;
