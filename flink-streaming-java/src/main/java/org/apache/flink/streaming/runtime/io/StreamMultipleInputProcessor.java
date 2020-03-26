@@ -81,13 +81,14 @@ public final class StreamMultipleInputProcessor implements StreamInputProcessor 
 		this.inputSelectionHandler = checkNotNull(inputSelectionHandler);
 
 		List<Input> inputs = streamOperator.getInputs();
-		int operatorsCount = inputs.size();
+		int inputsCount = inputs.size();
 
-		this.inputProcessors = new InputProcessor[operatorsCount];
-		this.streamStatuses = new StreamStatus[operatorsCount];
+		this.inputProcessors = new InputProcessor[inputsCount];
+		this.streamStatuses = new StreamStatus[inputsCount];
 		this.numRecordsIn = numRecordsIn;
 
-		for (int i = 0; i < operatorsCount; i++) {
+		for (int i = 0; i < inputsCount; i++) {
+			streamStatuses[i] = StreamStatus.ACTIVE;
 			StreamTaskNetworkOutput dataOutput = new StreamTaskNetworkOutput<>(
 				inputs.get(i),
 				streamStatusMaintainer,
@@ -273,8 +274,7 @@ public final class StreamMultipleInputProcessor implements StreamInputProcessor 
 
 		@Override
 		public void emitRecord(StreamRecord<T> record) throws Exception {
-			//TODO: support keyed operators
-			//input.setKeyContextElement(record);
+			input.setKeyContextElement(record);
 			input.processElement(record);
 			numRecordsIn.inc();
 			inputSelectionHandler.nextSelection();
@@ -282,7 +282,8 @@ public final class StreamMultipleInputProcessor implements StreamInputProcessor 
 
 		@Override
 		public void emitWatermark(Watermark watermark) throws Exception {
-			throw new UnsupportedOperationException();
+			inputWatermarkGauge.setCurrentWatermark(watermark.getTimestamp());
+			input.processWatermark(watermark);
 		}
 
 		@Override
@@ -304,7 +305,7 @@ public final class StreamMultipleInputProcessor implements StreamInputProcessor 
 
 		@Override
 		public void emitLatencyMarker(LatencyMarker latencyMarker) throws Exception {
-			throw new UnsupportedOperationException();
+			input.processLatencyMarker(latencyMarker);
 		}
 	}
 }

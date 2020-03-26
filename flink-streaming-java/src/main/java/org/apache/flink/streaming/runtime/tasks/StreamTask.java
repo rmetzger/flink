@@ -433,7 +433,7 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 			// both the following operations are protected by the lock
 			// so that we avoid race conditions in the case that initializeState()
 			// registers a timer, that fires before the open() is called.
-			operatorChain.initializeStateAndOpenOperators();
+			operatorChain.initializeStateAndOpenOperators(createStreamTaskStateInitializer());
 		});
 
 		isRunning = true;
@@ -907,7 +907,8 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 			getCancelables(),
 			getAsyncOperationsThreadPool(),
 			getEnvironment(),
-			this);
+			this,
+			this::isCanceled);
 	}
 
 	// ------------------------------------------------------------------------
