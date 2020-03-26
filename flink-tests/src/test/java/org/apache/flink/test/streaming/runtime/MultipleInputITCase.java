@@ -21,17 +21,14 @@ import org.apache.flink.api.common.typeinfo.BasicTypeInfo;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.MultipleConnectedStreams;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.graph.StreamConfig;
-import org.apache.flink.streaming.api.operators.AbstractStreamOperator;
-import org.apache.flink.streaming.api.operators.ChainingStrategy;
+import org.apache.flink.streaming.api.operators.AbstractStreamOperatorFactory;
+import org.apache.flink.streaming.api.operators.AbstractStreamOperatorV2;
 import org.apache.flink.streaming.api.operators.Input;
 import org.apache.flink.streaming.api.operators.MultipleInputStreamOperator;
-import org.apache.flink.streaming.api.operators.Output;
 import org.apache.flink.streaming.api.operators.StreamOperator;
-import org.apache.flink.streaming.api.operators.StreamOperatorFactory;
+import org.apache.flink.streaming.api.operators.StreamOperatorParameters;
 import org.apache.flink.streaming.api.transformations.MultipleInputTransformation;
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord;
-import org.apache.flink.streaming.runtime.tasks.StreamTask;
 import org.apache.flink.test.streaming.runtime.util.TestListResultSink;
 import org.apache.flink.test.util.AbstractTestBase;
 
@@ -86,12 +83,13 @@ public class MultipleInputITCase extends AbstractTestBase {
 
 	/**
 	 * 3 input operator that sums all of it inputs.
-	 * TODO: provide non {@link SetupableStreamOperator} variant of {@link AbstractStreamOperator}?
-	 * TODO: provide non {@link AbstractStreamOperator} seems to pre-override processWatermark1/2 and other
-	 * methods that are not defined there?
 	 */
-	public static class SumAllInputOperator extends AbstractStreamOperator<Long> implements MultipleInputStreamOperator<Long> {
+	public static class SumAllInputOperator extends AbstractStreamOperatorV2<Long> implements MultipleInputStreamOperator<Long> {
 		private long sum;
+
+		public SumAllInputOperator(StreamOperatorParameters<Long> parameters) {
+			super(parameters, 3);
+		}
 
 		@Override
 		public List<Input> getInputs() {
@@ -116,32 +114,15 @@ public class MultipleInputITCase extends AbstractTestBase {
 	/**
 	 * Factory for {@link SumAllInputOperator}.
 	 */
-	public static class SumAllInputOperatorFactory implements StreamOperatorFactory<Long> {
-		private ChainingStrategy chainingStrategy;
-
+	public static class SumAllInputOperatorFactory extends AbstractStreamOperatorFactory<Long> {
 		@Override
-		public <T extends StreamOperator<Long>> T createStreamOperator(
-				StreamTask<?, ?> containingTask,
-				StreamConfig config,
-				Output<StreamRecord<Long>> output) {
-			SumAllInputOperator sumAllInputOperator = new SumAllInputOperator();
-			sumAllInputOperator.setup(containingTask, config, output);
-			return (T) sumAllInputOperator;
-		}
-
-		@Override
-		public void setChainingStrategy(ChainingStrategy chainingStrategy) {
-			this.chainingStrategy = chainingStrategy;
-		}
-
-		@Override
-		public ChainingStrategy getChainingStrategy() {
-			return chainingStrategy;
+		public <T extends StreamOperator<Long>> T createStreamOperator(StreamOperatorParameters<Long> parameters) {
+			return (T) new SumAllInputOperator(parameters);
 		}
 
 		@Override
 		public Class<? extends StreamOperator> getStreamOperatorClass(ClassLoader classLoader) {
-			throw new UnsupportedOperationException();
+			return SumAllInputOperator.class;
 		}
 	}
 }
