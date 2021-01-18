@@ -27,7 +27,7 @@ public class DefaultFailureListener implements FailureListener {
 
     @Override
     public void init(JobManagerJobMetricGroup metricGroup) {
-        this.failureCount = metricGroup.counter(MetricNames.NUM_JOB_FAILURE);
+        this.failureCount = metricGroup.counter(MetricNames.NUM_JOB_FAILURES);
     }
 
     @Override

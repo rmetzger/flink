@@ -51,7 +51,7 @@ public class ExecutionFailureHandler {
     /** Number of all restarts happened since this job is submitted. */
     private long numberOfRestarts;
 
-    private Set<FailureListener> failureListeners;
+    private final Set<FailureListener> failureListeners;
 
     /**
      * Creates the handler to deal with task failures.
@@ -114,9 +114,7 @@ public class ExecutionFailureHandler {
 
     /** @param failureListener the failure listener to be registered */
     public void registerFailureListener(FailureListener failureListener) {
-        if (!failureListeners.contains(failureListener)) {
-            failureListeners.add(failureListener);
-        }
+        failureListeners.add(failureListener);
     }
 
     private FailureHandlingResult handleFailure(
@@ -126,8 +124,14 @@ public class ExecutionFailureHandler {
             final Set<ExecutionVertexID> verticesToRestart,
             final boolean globalFailure) {
 
-        for (FailureListener listener : failureListeners) {
-            listener.onFailure(cause, globalFailure);
+        try {
+            for (FailureListener listener : failureListeners) {
+                listener.onFailure(cause, globalFailure);
+            }
+        } catch (Throwable e) {
+            return FailureHandlingResult.unrecoverable(
+                    new JobException("The failure in failure listener is not recoverable", e),
+                    false);
         }
 
         if (isUnrecoverableError(cause)) {

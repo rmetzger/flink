@@ -162,8 +162,7 @@ public class DefaultScheduler extends SchedulerBase implements SchedulerOperatio
 
         this.verticesWaitingForRestart = new HashSet<>();
 
-        List<FailureListener> listeners =
-                failureListenerFactory.createFailureListener(jobManagerJobMetricGroup);
+        List<FailureListener> listeners = failureListenerFactory.createFailureListener();
 
         for (FailureListener listener : listeners) {
             executionFailureHandler.registerFailureListener(listener);

@@ -31,7 +31,7 @@ public interface FailureListener extends Plugin {
     void init(JobManagerJobMetricGroup metricGroup);
 
     /**
-     * Method to handle each of failures in the listener.
+     * Method to handle a failure in the listener.
      *
      * @param cause the failure cause
      * @param globalFailure whether the failure is a global failure

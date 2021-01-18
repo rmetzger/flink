@@ -39,12 +39,12 @@ public class FailureListenerFactoryTest {
     @Test
     public void testLoadDefaultFailureListener() throws URISyntaxException {
         FailureListenerFactory failureListenerFactory =
-                new FailureListenerFactory(new Configuration());
-
-        List<FailureListener> failureListenerList =
-                failureListenerFactory.createFailureListener(
+                new FailureListenerFactory(
+                        new Configuration(),
                         UnregisteredJobManagerJobMetricGroupFactory.INSTANCE.create(
                                 new JobGraph("Test")));
+
+        List<FailureListener> failureListenerList = failureListenerFactory.createFailureListener();
 
         assertEquals(1, failureListenerList.size());
         assertTrue(failureListenerList.get(0) instanceof DefaultFailureListener);

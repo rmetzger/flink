@@ -49,7 +49,7 @@ import java.util.List;
 import java.util.Map;
 
 /** Test for {@link org.apache.flink.runtime.executiongraph.FailureListenerFactory}. */
-public class FailureListenerFactoryTest extends PluginTestBase {
+public class FailureListenerPluginTest extends PluginTestBase {
 
     @Rule public TemporaryFolder temporaryFolder = new TemporaryFolder();
 
@@ -102,11 +102,10 @@ public class FailureListenerFactoryTest extends PluginTestBase {
         CommonTestUtils.setEnv(envVariables);
 
         FailureListenerFactory failureListenerFactory =
-                new FailureListenerFactory(new Configuration());
-
-        List<FailureListener> failureListeners =
-                failureListenerFactory.createFailureListener(
+                new FailureListenerFactory(
+                        new Configuration(),
                         UnregisteredMetricGroups.createUnregisteredJobManagerJobMetricGroup());
+        List<FailureListener> failureListeners = failureListenerFactory.createFailureListener();
 
         Assert.assertEquals(2, failureListeners.size());
     }

@@ -416,7 +416,7 @@ public class SchedulerTestingUtils {
         private JobStatusListener jobStatusListener =
                 (ignoredA, ignoredB, ignoredC, ignoredD) -> {};
         private FailureListenerFactory failureListenerFactory =
-                new FailureListenerFactory(jobMasterConfiguration);
+                new FailureListenerFactory(jobMasterConfiguration, jobManagerJobMetricGroup);
 
         public DefaultSchedulerBuilder(
                 final JobGraph jobGraph, ComponentMainThreadExecutor mainThreadExecutor) {

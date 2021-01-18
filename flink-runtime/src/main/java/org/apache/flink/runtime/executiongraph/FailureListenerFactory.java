@@ -22,36 +22,29 @@ import org.apache.flink.core.plugin.PluginManager;
 import org.apache.flink.core.plugin.PluginUtils;
 import org.apache.flink.runtime.metrics.groups.JobManagerJobMetricGroup;
 
-import org.apache.flink.shaded.guava18.com.google.common.collect.Iterators;
-
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.ServiceLoader;
 
 /** Factory class for creating {@link FailureListener} with plugin Manager. */
 public class FailureListenerFactory {
-    private PluginManager pluginManager;
+    private final PluginManager pluginManager;
+    private List<FailureListener> failureListeners = new ArrayList<>();
 
-    public FailureListenerFactory(Configuration configuration) {
+    public FailureListenerFactory(
+            Configuration configuration, JobManagerJobMetricGroup metricGroup) {
         this.pluginManager = PluginUtils.createPluginManagerFromRootFolder(configuration);
-    }
-
-    public List<FailureListener> createFailureListener(JobManagerJobMetricGroup metricGroup) {
-        List<FailureListener> failureListeners = new ArrayList<>();
-
-        ServiceLoader<FailureListener> serviceLoader = ServiceLoader.load(FailureListener.class);
-        Iterator<FailureListener> fromServiceLoader = serviceLoader.iterator();
         Iterator<FailureListener> fromPluginManager = pluginManager.load(FailureListener.class);
+        failureListeners.add(new DefaultFailureListener());
 
-        Iterator<FailureListener> iterator = Iterators.concat(fromServiceLoader, fromPluginManager);
-
-        while (iterator.hasNext()) {
-            FailureListener failureListener = iterator.next();
+        while (fromPluginManager.hasNext()) {
+            FailureListener failureListener = fromPluginManager.next();
             failureListener.init(metricGroup);
             failureListeners.add(failureListener);
         }
+    }
 
+    public List<FailureListener> createFailureListener() {
         return failureListeners;
     }
 }

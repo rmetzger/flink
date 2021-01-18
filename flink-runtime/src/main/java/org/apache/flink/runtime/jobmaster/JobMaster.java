@@ -341,7 +341,8 @@ public class JobMaster extends PermanentlyFencedRpcEndpoint<JobMasterId>
             JobStatusListener jobStatusListener)
             throws Exception {
 
-        FailureListenerFactory failureListenerFactory = new FailureListenerFactory(configuration);
+        FailureListenerFactory failureListenerFactory =
+                new FailureListenerFactory(configuration, jobManagerJobMetricGroup);
 
         final SchedulerNG scheduler =
                 slotPoolServiceSchedulerFactory.createScheduler(
