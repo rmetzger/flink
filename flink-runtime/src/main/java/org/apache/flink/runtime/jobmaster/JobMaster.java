@@ -25,6 +25,7 @@ import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.JobManagerOptions;
+import org.apache.flink.core.failurelistener.FailureListener;
 import org.apache.flink.queryablestate.KvStateID;
 import org.apache.flink.runtime.accumulators.AccumulatorSnapshot;
 import org.apache.flink.runtime.blob.BlobWriter;
@@ -35,8 +36,8 @@ import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.execution.ExecutionState;
 import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
-import org.apache.flink.runtime.executiongraph.FailureListenerFactory;
 import org.apache.flink.runtime.executiongraph.JobStatusListener;
+import org.apache.flink.runtime.failurelistener.FailureListenerUtils;
 import org.apache.flink.runtime.heartbeat.HeartbeatListener;
 import org.apache.flink.runtime.heartbeat.HeartbeatManager;
 import org.apache.flink.runtime.heartbeat.HeartbeatServices;
@@ -101,6 +102,7 @@ import java.net.InetSocketAddress;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -341,8 +343,8 @@ public class JobMaster extends PermanentlyFencedRpcEndpoint<JobMasterId>
             JobStatusListener jobStatusListener)
             throws Exception {
 
-        FailureListenerFactory failureListenerFactory =
-                new FailureListenerFactory(configuration, jobManagerJobMetricGroup);
+        List<FailureListener> failureListeners =
+                FailureListenerUtils.createFailureListener(configuration, jobManagerJobMetricGroup);
 
         final SchedulerNG scheduler =
                 slotPoolServiceSchedulerFactory.createScheduler(
@@ -365,7 +367,7 @@ public class JobMaster extends PermanentlyFencedRpcEndpoint<JobMasterId>
                         getMainThreadExecutor(),
                         fatalErrorHandler,
                         jobStatusListener,
-                        failureListenerFactory);
+                        failureListeners);
 
         return scheduler;
     }

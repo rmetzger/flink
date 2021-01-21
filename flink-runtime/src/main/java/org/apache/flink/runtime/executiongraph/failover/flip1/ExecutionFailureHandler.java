@@ -17,8 +17,8 @@
 
 package org.apache.flink.runtime.executiongraph.failover.flip1;
 
+import org.apache.flink.core.failurelistener.FailureListener;
 import org.apache.flink.runtime.JobException;
-import org.apache.flink.runtime.executiongraph.FailureListener;
 import org.apache.flink.runtime.scheduler.strategy.ExecutionVertexID;
 import org.apache.flink.runtime.scheduler.strategy.SchedulingExecutionVertex;
 import org.apache.flink.runtime.scheduler.strategy.SchedulingTopology;
@@ -130,8 +130,7 @@ public class ExecutionFailureHandler {
             }
         } catch (Throwable e) {
             return FailureHandlingResult.unrecoverable(
-                    new JobException("The failure in failure listener is not recoverable", e),
-                    false);
+                    new JobException("Unexpected excepton in FailureListener", e), false);
         }
 
         if (isUnrecoverableError(cause)) {

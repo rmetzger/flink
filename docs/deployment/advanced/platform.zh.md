@@ -35,9 +35,11 @@ Flink通过插件框架为平台用户提供了一些自制定的功能.
 
 要为你所使用的错误监听器实现自定义插件，你需要：
 
-  - 添加你自定义的 FailureListener，该 FailureListener 需要实现  `org.apache.flink.runtime.executiongraph.FailureListener` 接口。
+  - 添加你自定义的 FailureListener，该 FailureListener 需要实现  `org.apache.flink.core.failurelistener.FailureListener` 接口。
+  
+  - 添加你自定义的 FailureListenerFactory，该 FailureListenerFactory 需要实现  `org.apache.flink.core.failurelistener.FailureListenerFactory` 接口。
 
-  - 添加服务入口。创建 `META-INF/services/org.apache.flink.runtime.executiongraph.FailureListener` 文件，其中包含了你自定义FailureListener的的类名（更多细节请参看 [Java Service Loader](https://docs.oracle.com/javase/8/docs/api/java/util/ServiceLoader.html)）。
+  - 添加服务入口。创建 `META-INF/services/org.apache.flink.core.failurelistener.FailureListenerFactory` 文件，其中包含了你自定义FailureListenerFactory的的类名（更多细节请参看 [Java Service Loader](https://docs.oracle.com/javase/8/docs/api/java/util/ServiceLoader.html)）。
 
-之后，将自定义的 `FailureListener`，`META-INF/services/` 和所有外部依赖打入 jar 包。在你的 Flink 发行版的 `plugins/` 文件夹中创建一个名为“failure-listener”的文件夹，将打好的 jar 包放入其中。
+之后，将自定义的 `FailureListener`，`FailureListenerFactory`, `META-INF/services/` 和所有外部依赖打入 jar 包。在你的 Flink 发行版的 `plugins/` 文件夹中创建一个名为“failure-listener”的文件夹，将打好的 jar 包放入其中。
 更多细节请查看 [Flink Plugin]({% link deployment/filesystems/plugins.zh.md %})。

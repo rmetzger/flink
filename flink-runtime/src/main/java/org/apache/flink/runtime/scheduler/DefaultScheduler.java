@@ -21,6 +21,7 @@ package org.apache.flink.runtime.scheduler;
 
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.core.failurelistener.FailureListener;
 import org.apache.flink.runtime.checkpoint.CheckpointRecoveryFactory;
 import org.apache.flink.runtime.clusterframework.types.AllocationID;
 import org.apache.flink.runtime.clusterframework.types.ResourceProfile;
@@ -30,8 +31,6 @@ import org.apache.flink.runtime.concurrent.ScheduledExecutor;
 import org.apache.flink.runtime.execution.ExecutionState;
 import org.apache.flink.runtime.executiongraph.ExecutionJobVertex;
 import org.apache.flink.runtime.executiongraph.ExecutionVertex;
-import org.apache.flink.runtime.executiongraph.FailureListener;
-import org.apache.flink.runtime.executiongraph.FailureListenerFactory;
 import org.apache.flink.runtime.executiongraph.JobStatusListener;
 import org.apache.flink.runtime.executiongraph.TaskExecutionStateTransition;
 import org.apache.flink.runtime.executiongraph.failover.flip1.ExecutionFailureHandler;
@@ -117,7 +116,7 @@ public class DefaultScheduler extends SchedulerBase implements SchedulerOperatio
             final ComponentMainThreadExecutor mainThreadExecutor,
             final JobStatusListener jobStatusListener,
             final ExecutionGraphFactory executionGraphFactory,
-            final FailureListenerFactory failureListenerFactory)
+            final List<FailureListener> failureListeners)
             throws Exception {
 
         super(
@@ -162,9 +161,7 @@ public class DefaultScheduler extends SchedulerBase implements SchedulerOperatio
 
         this.verticesWaitingForRestart = new HashSet<>();
 
-        List<FailureListener> listeners = failureListenerFactory.createFailureListener();
-
-        for (FailureListener listener : listeners) {
+        for (FailureListener listener : failureListeners) {
             executionFailureHandler.registerFailureListener(listener);
         }
 

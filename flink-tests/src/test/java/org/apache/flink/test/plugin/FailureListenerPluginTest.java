@@ -20,14 +20,15 @@ package org.apache.flink.test.plugin;
 
 import org.apache.flink.configuration.ConfigConstants;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.core.failurelistener.FailureListener;
+import org.apache.flink.core.failurelistener.FailureListenerFactory;
 import org.apache.flink.core.plugin.DefaultPluginManager;
 import org.apache.flink.core.plugin.DirectoryBasedPluginFinder;
 import org.apache.flink.core.plugin.PluginDescriptor;
 import org.apache.flink.core.plugin.PluginFinder;
 import org.apache.flink.core.plugin.PluginManager;
 import org.apache.flink.core.testutils.CommonTestUtils;
-import org.apache.flink.runtime.executiongraph.FailureListener;
-import org.apache.flink.runtime.executiongraph.FailureListenerFactory;
+import org.apache.flink.runtime.failurelistener.FailureListenerUtils;
 import org.apache.flink.runtime.metrics.groups.UnregisteredMetricGroups;
 import org.apache.flink.util.Preconditions;
 
@@ -48,7 +49,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
-/** Test for {@link org.apache.flink.runtime.executiongraph.FailureListenerFactory}. */
+/** Test for {@link org.apache.flink.core.failurelistener.FailureListenerFactory}. */
 public class FailureListenerPluginTest extends PluginTestBase {
 
     @Rule public TemporaryFolder temporaryFolder = new TemporaryFolder();
@@ -87,8 +88,8 @@ public class FailureListenerPluginTest extends PluginTestBase {
         String[] parentPatterns = {FailureListener.class.getName()};
         final PluginManager pluginManager =
                 new DefaultPluginManager(descriptors, PARENT_CLASS_LOADER, parentPatterns);
-        final List<FailureListener> serviceImplList =
-                Lists.newArrayList(pluginManager.load(FailureListener.class));
+        final List<FailureListenerFactory> serviceImplList =
+                Lists.newArrayList(pluginManager.load(FailureListenerFactory.class));
         Assert.assertEquals(1, serviceImplList.size());
     }
 
@@ -101,11 +102,10 @@ public class FailureListenerPluginTest extends PluginTestBase {
                         new File(pluginRootFolderPath.toUri()).getAbsolutePath());
         CommonTestUtils.setEnv(envVariables);
 
-        FailureListenerFactory failureListenerFactory =
-                new FailureListenerFactory(
+        List<FailureListener> failureListeners =
+                FailureListenerUtils.createFailureListener(
                         new Configuration(),
                         UnregisteredMetricGroups.createUnregisteredJobManagerJobMetricGroup());
-        List<FailureListener> failureListeners = failureListenerFactory.createFailureListener();
 
         Assert.assertEquals(2, failureListeners.size());
     }

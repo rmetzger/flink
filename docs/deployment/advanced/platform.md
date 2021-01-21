@@ -36,12 +36,14 @@ failures due to network, platform reliability, etc.
 
 To implement a plugin for your custom resource type, you need to:
 
-  - Add your own FailureListener by implementing the `org.apache.flink.runtime.executiongraph.FailureListener` interface.
+  - Add your own FailureListener by implementing the `org.apache.flink.core.failurelistener.FailureListener` interface.
+  
+  - Add your own FailureListenerFactory by implementing the `org.apache.flink.core.failurelistener.FailureListenerFactory` interface.
 
-  - Add a service entry. Create a file `META-INF/services/org.apache.flink.runtime.executiongraph.FailureListener`
-  which contains the class name of your failure listener class (see the [Java Service Loader](https://docs.oracle.com/javase/8/docs/api/java/util/ServiceLoader.html) docs for more details).
+  - Add a service entry. Create a file `META-INF/services/org.apache.flink.core.failurelistener.FailureListenerFactory`
+  which contains the class name of your failure listener factory class (see the [Java Service Loader](https://docs.oracle.com/javase/8/docs/api/java/util/ServiceLoader.html) docs for more details).
 
 
-Then, create a jar which includes your `FailureListener`, `META-INF/services/` and all the external dependencies.
+Then, create a jar which includes your `FailureListener`, `FailureListenerFactory`, `META-INF/services/` and all the external dependencies.
 Make a directory in `plugins/` of your Flink distribution with an arbitrary name, e.g. "failure-listener", and put the jar into this directory.
 See [Flink Plugin]({% link deployment/filesystems/plugins.md %}) for more details.

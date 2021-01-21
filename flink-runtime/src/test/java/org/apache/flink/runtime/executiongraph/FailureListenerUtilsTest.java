@@ -19,34 +19,34 @@
 package org.apache.flink.runtime.executiongraph;
 
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.core.failurelistener.FailureListener;
+import org.apache.flink.runtime.failurelistener.DefaultFailureListener;
+import org.apache.flink.runtime.failurelistener.FailureListenerUtils;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobmaster.factories.UnregisteredJobManagerJobMetricGroupFactory;
 
 import org.junit.Test;
 
-import java.net.URISyntaxException;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 /**
- * Test for {@link org.apache.flink.runtime.executiongraph.DefaultFailureListener} created by {@link
- * org.apache.flink.runtime.executiongraph.FailureListenerFactory}.
+ * Test for {@link DefaultFailureListener} created by {@link
+ * org.apache.flink.runtime.failurelistener.FailureListenerUtils}.
  */
-public class FailureListenerFactoryTest {
+public class FailureListenerUtilsTest {
 
     @Test
-    public void testLoadDefaultFailureListener() throws URISyntaxException {
-        FailureListenerFactory failureListenerFactory =
-                new FailureListenerFactory(
+    public void testLoadDefaultFailureListener() {
+        List<FailureListener> failureListeners =
+                FailureListenerUtils.createFailureListener(
                         new Configuration(),
                         UnregisteredJobManagerJobMetricGroupFactory.INSTANCE.create(
                                 new JobGraph("Test")));
 
-        List<FailureListener> failureListenerList = failureListenerFactory.createFailureListener();
-
-        assertEquals(1, failureListenerList.size());
-        assertTrue(failureListenerList.get(0) instanceof DefaultFailureListener);
+        assertEquals(1, failureListeners.size());
+        assertTrue(failureListeners.get(0) instanceof DefaultFailureListener);
     }
 }

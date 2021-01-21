@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,17 +16,21 @@
  * limitations under the License.
  */
 
-package org.apache.flink.test.plugin.jar.failurelistener;
+package org.apache.flink.core.failurelistener;
 
-import org.apache.flink.core.failurelistener.FailureListener;
-import org.apache.flink.metrics.MetricGroup;
+import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.core.plugin.Plugin;
 
-/** Implementation of {@link FailureListener} for plugin loading test. */
-public class TestFailureListener implements FailureListener {
+/** Factory class for creating {@link FailureListener}. */
+@PublicEvolving
+public interface FailureListenerFactory extends Plugin {
 
-    @Override
-    public void init(String jobName, MetricGroup metricGroup) {}
-
-    @Override
-    public void onFailure(Throwable cause, boolean globalFailure) {}
+    /**
+     * Construct the FailureListener from configuration.
+     *
+     * @param configuration for this failure listener
+     * @return the failure listener
+     */
+    FailureListener createFailureListener(Configuration configuration);
 }

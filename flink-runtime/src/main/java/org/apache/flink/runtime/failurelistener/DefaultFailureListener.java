@@ -15,18 +15,22 @@
  * limitations under the License.
  */
 
-package org.apache.flink.runtime.executiongraph;
+package org.apache.flink.runtime.failurelistener;
 
+import org.apache.flink.core.failurelistener.FailureListener;
 import org.apache.flink.metrics.Counter;
+import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.metrics.MetricNames;
-import org.apache.flink.runtime.metrics.groups.JobManagerJobMetricGroup;
 
-/** Default implementation {@link FailureListener} that record metrics of job failures. */
+/**
+ * Default implementation {@link org.apache.flink.core.failurelistener.FailureListener} that record
+ * metrics of job failures.
+ */
 public class DefaultFailureListener implements FailureListener {
     private Counter failureCount;
 
     @Override
-    public void init(JobManagerJobMetricGroup metricGroup) {
+    public void init(String jobName, MetricGroup metricGroup) {
         this.failureCount = metricGroup.counter(MetricNames.NUM_JOB_FAILURES);
     }
 
