@@ -19,6 +19,7 @@
 package org.apache.flink.core.failurelistener;
 
 import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.metrics.MetricGroup;
 
 /** Failure listener to customize the behavior for each type of failures tracked in job manager. */
@@ -28,10 +29,11 @@ public interface FailureListener {
     /**
      * Initialize the FailureListener with MetricGroup.
      *
+     * @param jobID unique identifier for a Flink Job
      * @param jobName the name job whose failure will be subscribed by the listener
      * @param metricGroup metrics group that the listener can add customized metrics definition.
      */
-    void init(String jobName, MetricGroup metricGroup);
+    void init(JobID jobID, String jobName, MetricGroup metricGroup);
 
     /**
      * Method to handle a failure in the listener.

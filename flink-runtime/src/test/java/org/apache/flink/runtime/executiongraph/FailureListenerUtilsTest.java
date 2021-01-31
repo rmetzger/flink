@@ -41,7 +41,7 @@ public class FailureListenerUtilsTest {
     @Test
     public void testLoadDefaultFailureListener() {
         List<FailureListener> failureListeners =
-                FailureListenerUtils.createFailureListener(
+                FailureListenerUtils.getFailureListerners(
                         new Configuration(),
                         UnregisteredJobManagerJobMetricGroupFactory.INSTANCE.create(
                                 new JobGraph("Test")));

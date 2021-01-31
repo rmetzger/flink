@@ -103,7 +103,7 @@ public class FailureListenerPluginTest extends PluginTestBase {
         CommonTestUtils.setEnv(envVariables);
 
         List<FailureListener> failureListeners =
-                FailureListenerUtils.createFailureListener(
+                FailureListenerUtils.getFailureListerners(
                         new Configuration(),
                         UnregisteredMetricGroups.createUnregisteredJobManagerJobMetricGroup());
 

@@ -130,7 +130,7 @@ public class ExecutionFailureHandler {
             }
         } catch (Throwable e) {
             return FailureHandlingResult.unrecoverable(
-                    new JobException("Unexpected excepton in FailureListener", e), false);
+                    new JobException("Unexpected exception in FailureListener", e), false);
         }
 
         if (isUnrecoverableError(cause)) {

@@ -25,14 +25,15 @@ under the License.
 Flink provides a set of customizable features for users to extend from the default behavior through the plugin framework.
 
 ## Customize Failure Listener
-For each of execution exceptions in a flink job, it will be passed to the job master. The default failure listener is only
-to record the failure count and emit the metrics numJobFailure for the job. If you need an advanced classification on exceptions, 
-you can build a plugin to customize failure listener. For example, it can distinguish whether it is a flink runtime error or an 
-application user logic error. With the accurate metrics, you may have better idea about the platform level metrics, for example 
-failures due to network, platform reliability, etc.
+Flink provides the pluggable failure listener interface for users to register multiple instances, which are called each 
+time an exception reported at runtime. The default failure listener is only to record the failure count and emit the metric
+"numJobFailure" for the job. The purpose of these listeners is to build metrics based on the exceptions, make call to external
+systems or classify the exceptions otherwise. For example, it can distinguish whether it is a flink runtime error or an 
+application user logic error. With the accurate metrics, you may have better idea about the platform level metrics, 
+for example failures due to network, platform reliability, etc.
 
 
-# Implement a plugin for your custom failure listener
+### Implement a plugin for your custom failure listener
 
 To implement a plugin for your custom resource type, you need to:
 

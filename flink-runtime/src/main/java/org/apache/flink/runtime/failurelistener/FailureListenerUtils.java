@@ -32,7 +32,7 @@ import java.util.List;
 /** Utils for creating failure listener. */
 public class FailureListenerUtils {
 
-    public static List<FailureListener> createFailureListener(
+    public static List<FailureListener> getFailureListerners(
             Configuration configuration, JobManagerJobMetricGroup metricGroup) {
         PluginManager pluginManager = PluginUtils.createPluginManagerFromRootFolder(configuration);
         Iterator<FailureListenerFactory> fromPluginManager =
@@ -40,13 +40,13 @@ public class FailureListenerUtils {
 
         List<FailureListener> failureListeners = new ArrayList<>();
         DefaultFailureListener defaultFailureListener = new DefaultFailureListener();
-        defaultFailureListener.init(metricGroup.jobName(), metricGroup);
+        defaultFailureListener.init(metricGroup.jobId(), metricGroup.jobName(), metricGroup);
         failureListeners.add(defaultFailureListener);
         while (fromPluginManager.hasNext()) {
             FailureListenerFactory failureListenerFactory = fromPluginManager.next();
             FailureListener failureListener =
                     failureListenerFactory.createFailureListener(configuration);
-            failureListener.init(metricGroup.jobName(), metricGroup);
+            failureListener.init(metricGroup.jobId(), metricGroup.jobName(), metricGroup);
             failureListeners.add(failureListener);
         }
 
