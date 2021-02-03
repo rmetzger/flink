@@ -18,15 +18,10 @@
 
 package org.apache.flink.test.plugin.jar.failurelistener;
 
-import org.apache.flink.api.common.JobID;
 import org.apache.flink.core.failurelistener.FailureListener;
-import org.apache.flink.metrics.MetricGroup;
 
 /** Implementation of {@link FailureListener} for plugin loading test. */
 public class TestFailureListener implements FailureListener {
-
-    @Override
-    public void init(JobID jobID, String jobName, MetricGroup metricGroup) {}
 
     @Override
     public void onFailure(Throwable cause, boolean globalFailure) {}

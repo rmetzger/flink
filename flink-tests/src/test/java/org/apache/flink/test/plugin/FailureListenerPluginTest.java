@@ -18,6 +18,7 @@
 
 package org.apache.flink.test.plugin;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.ConfigConstants;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.failurelistener.FailureListener;
@@ -48,6 +49,7 @@ import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /** Test for {@link org.apache.flink.core.failurelistener.FailureListenerFactory}. */
 public class FailureListenerPluginTest extends PluginTestBase {
@@ -102,9 +104,11 @@ public class FailureListenerPluginTest extends PluginTestBase {
                         new File(pluginRootFolderPath.toUri()).getAbsolutePath());
         CommonTestUtils.setEnv(envVariables);
 
-        List<FailureListener> failureListeners =
-                FailureListenerUtils.getFailureListerners(
+        Set<FailureListener> failureListeners =
+                FailureListenerUtils.getFailureListeners(
                         new Configuration(),
+                        JobID.generate(),
+                        "test-job",
                         UnregisteredMetricGroups.createUnregisteredJobManagerJobMetricGroup());
 
         Assert.assertEquals(2, failureListeners.size());

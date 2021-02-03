@@ -102,7 +102,6 @@ import java.net.InetSocketAddress;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -317,13 +316,22 @@ public class JobMaster extends PermanentlyFencedRpcEndpoint<JobMasterId>
 
         this.jobManagerJobMetricGroup = jobMetricGroupFactory.create(jobGraph);
         this.jobStatusListener = new JobManagerJobStatusListener();
+
+        Set<FailureListener> failureListeners =
+                FailureListenerUtils.getFailureListeners(
+                        jobMasterConfiguration.getConfiguration(),
+                        jid,
+                        jobName,
+                        jobManagerJobMetricGroup);
+
         this.schedulerNG =
                 createScheduler(
                         slotPoolServiceSchedulerFactory,
                         jobMasterConfiguration.getConfiguration(),
                         executionDeploymentTracker,
                         jobManagerJobMetricGroup,
-                        jobStatusListener);
+                        jobStatusListener,
+                        failureListeners);
 
         this.heartbeatServices = checkNotNull(heartbeatServices);
         this.taskManagerHeartbeatManager = NoOpHeartbeatManager.getInstance();
@@ -340,11 +348,9 @@ public class JobMaster extends PermanentlyFencedRpcEndpoint<JobMasterId>
             Configuration configuration,
             ExecutionDeploymentTracker executionDeploymentTracker,
             JobManagerJobMetricGroup jobManagerJobMetricGroup,
-            JobStatusListener jobStatusListener)
+            JobStatusListener jobStatusListener,
+            Set<FailureListener> failureListeners)
             throws Exception {
-
-        List<FailureListener> failureListeners =
-                FailureListenerUtils.getFailureListerners(configuration, jobManagerJobMetricGroup);
 
         final SchedulerNG scheduler =
                 slotPoolServiceSchedulerFactory.createScheduler(

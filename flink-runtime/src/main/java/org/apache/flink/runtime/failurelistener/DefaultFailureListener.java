@@ -17,7 +17,6 @@
 
 package org.apache.flink.runtime.failurelistener;
 
-import org.apache.flink.api.common.JobID;
 import org.apache.flink.core.failurelistener.FailureListener;
 import org.apache.flink.metrics.Counter;
 import org.apache.flink.metrics.MetricGroup;
@@ -28,10 +27,9 @@ import org.apache.flink.runtime.metrics.MetricNames;
  * metrics of job failures.
  */
 public class DefaultFailureListener implements FailureListener {
-    private Counter failureCount;
+    private final Counter failureCount;
 
-    @Override
-    public void init(JobID jobID, String jobName, MetricGroup metricGroup) {
+    public DefaultFailureListener(MetricGroup metricGroup) {
         this.failureCount = metricGroup.counter(MetricNames.NUM_JOB_FAILURES);
     }
 

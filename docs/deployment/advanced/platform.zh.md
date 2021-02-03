@@ -43,3 +43,6 @@ Flink提高了一错误监听器接口。其中的的默认错误监听器会记
 
 之后，将自定义的 `FailureListener`，`FailureListenerFactory`, `META-INF/services/` 和所有外部依赖打入 jar 包。在你的 Flink 发行版的 `plugins/` 文件夹中创建一个名为“failure-listener”的文件夹，将打好的 jar 包放入其中。
 更多细节请查看 [Flink Plugin]({% link deployment/filesystems/plugins.zh.md %})。
+
+你在插件里使用logger的时候，可能log4j不能正确的初始化。这是Flink插件是在不同的类加载器里加载的导致的。这个时候你需要在`flink-conf.yaml`里添加一些的配置：
+- `plugin.classloader.parent-first-patterns.additional: org.slf4j`

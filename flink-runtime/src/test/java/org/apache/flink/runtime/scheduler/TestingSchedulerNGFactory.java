@@ -36,7 +36,7 @@ import org.apache.flink.runtime.shuffle.ShuffleMaster;
 
 import org.slf4j.Logger;
 
-import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -72,7 +72,7 @@ public class TestingSchedulerNGFactory implements SchedulerNGFactory {
             ComponentMainThreadExecutor mainThreadExecutor,
             FatalErrorHandler fatalErrorHandler,
             JobStatusListener jobStatusListener,
-            List<FailureListener> failureListenerList)
+            Set<FailureListener> failureListenerList)
             throws Exception {
         return schedulerNG;
     }

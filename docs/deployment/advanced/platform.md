@@ -25,11 +25,11 @@ under the License.
 Flink provides a set of customizable features for users to extend from the default behavior through the plugin framework.
 
 ## Customize Failure Listener
-Flink provides the pluggable failure listener interface for users to register multiple instances, which are called each 
-time an exception reported at runtime. The default failure listener is only to record the failure count and emit the metric
-"numJobFailure" for the job. The purpose of these listeners is to build metrics based on the exceptions, make call to external
-systems or classify the exceptions otherwise. For example, it can distinguish whether it is a flink runtime error or an 
-application user logic error. With the accurate metrics, you may have better idea about the platform level metrics, 
+Flink provides a pluggable failure listener interface for users to register multiple instances, which are called each 
+time an exception that is reported at runtime. The default failure listener only records the failure count and emit the metric
+"numJobFailure" for the job. The purpose of these listeners is to build metrics based on the exceptions, make calls to external
+systems or classify the exceptions otherwise. For example, it can distinguish whether it is a Flink runtime error or an 
+application user logic error. With accurate metrics, you may have a better idea about the platform level metrics, 
 for example failures due to network, platform reliability, etc.
 
 
@@ -48,3 +48,8 @@ To implement a plugin for your custom resource type, you need to:
 Then, create a jar which includes your `FailureListener`, `FailureListenerFactory`, `META-INF/services/` and all the external dependencies.
 Make a directory in `plugins/` of your Flink distribution with an arbitrary name, e.g. "failure-listener", and put the jar into this directory.
 See [Flink Plugin]({% link deployment/filesystems/plugins.md %}) for more details.
+
+As a plugin will be loaded in different classloader, log4j is not able to initialized correctly in your plugin. In this case,
+you should add the config below in `flink-conf.yaml`:
+- `plugin.classloader.parent-first-patterns.additional: org.slf4j`
+

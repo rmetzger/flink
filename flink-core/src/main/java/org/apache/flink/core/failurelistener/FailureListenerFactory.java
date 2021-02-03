@@ -19,18 +19,24 @@
 package org.apache.flink.core.failurelistener;
 
 import org.apache.flink.annotation.PublicEvolving;
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.plugin.Plugin;
+import org.apache.flink.metrics.MetricGroup;
 
 /** Factory class for creating {@link FailureListener}. */
 @PublicEvolving
 public interface FailureListenerFactory extends Plugin {
 
     /**
-     * Construct the FailureListener from configuration.
+     * Construct a FailureListener.
      *
      * @param configuration for this failure listener
+     * @param jobId Id of the job
+     * @param jobName name of the job
+     * @param metricGroup Metric group of the JobMaster to publish metrics from the factory
      * @return the failure listener
      */
-    FailureListener createFailureListener(Configuration configuration);
+    FailureListener createFailureListener(
+            Configuration configuration, JobID jobId, String jobName, MetricGroup metricGroup);
 }

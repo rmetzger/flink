@@ -42,7 +42,7 @@ import org.apache.flink.runtime.shuffle.ShuffleMaster;
 
 import org.slf4j.Logger;
 
-import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -72,7 +72,7 @@ public class DefaultSchedulerFactory implements SchedulerNGFactory {
             final ComponentMainThreadExecutor mainThreadExecutor,
             final FatalErrorHandler fatalErrorHandler,
             final JobStatusListener jobStatusListener,
-            final List<FailureListener> failureListeners)
+            final Set<FailureListener> failureListeners)
             throws Exception {
 
         final SlotPool slotPool =

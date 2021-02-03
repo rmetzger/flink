@@ -18,35 +18,34 @@
 
 package org.apache.flink.runtime.failurelistener;
 
+import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.core.failurelistener.FailureListener;
 import org.apache.flink.core.failurelistener.FailureListenerFactory;
 import org.apache.flink.core.plugin.PluginManager;
 import org.apache.flink.core.plugin.PluginUtils;
-import org.apache.flink.runtime.metrics.groups.JobManagerJobMetricGroup;
+import org.apache.flink.metrics.MetricGroup;
 
-import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
+import java.util.Set;
 
 /** Utils for creating failure listener. */
 public class FailureListenerUtils {
 
-    public static List<FailureListener> getFailureListerners(
-            Configuration configuration, JobManagerJobMetricGroup metricGroup) {
+    public static Set<FailureListener> getFailureListeners(
+            Configuration configuration, JobID jobId, String jobName, MetricGroup metricGroup) {
         PluginManager pluginManager = PluginUtils.createPluginManagerFromRootFolder(configuration);
         Iterator<FailureListenerFactory> fromPluginManager =
                 pluginManager.load(FailureListenerFactory.class);
 
-        List<FailureListener> failureListeners = new ArrayList<>();
-        DefaultFailureListener defaultFailureListener = new DefaultFailureListener();
-        defaultFailureListener.init(metricGroup.jobId(), metricGroup.jobName(), metricGroup);
-        failureListeners.add(defaultFailureListener);
+        Set<FailureListener> failureListeners = new HashSet<>();
+        failureListeners.add(new DefaultFailureListener(metricGroup));
         while (fromPluginManager.hasNext()) {
             FailureListenerFactory failureListenerFactory = fromPluginManager.next();
             FailureListener failureListener =
-                    failureListenerFactory.createFailureListener(configuration);
-            failureListener.init(metricGroup.jobId(), metricGroup.jobName(), metricGroup);
+                    failureListenerFactory.createFailureListener(
+                            configuration, jobId, jobName, metricGroup);
             failureListeners.add(failureListener);
         }
 

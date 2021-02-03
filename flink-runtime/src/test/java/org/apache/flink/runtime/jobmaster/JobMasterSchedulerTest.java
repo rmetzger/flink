@@ -46,7 +46,7 @@ import org.junit.ClassRule;
 import org.junit.Test;
 import org.slf4j.Logger;
 
-import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 
@@ -115,7 +115,7 @@ public class JobMasterSchedulerTest extends TestLogger {
                 ComponentMainThreadExecutor mainThreadExecutor,
                 FatalErrorHandler fatalErrorHandler,
                 JobStatusListener jobStatusListener,
-                List<FailureListener> failureListenerFactory) {
+                Set<FailureListener> failureListeners) {
             return TestingSchedulerNG.newBuilder()
                     .setStartSchedulingRunnable(
                             () -> {

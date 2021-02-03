@@ -27,7 +27,7 @@ import org.apache.flink.runtime.jobmaster.factories.UnregisteredJobManagerJobMet
 
 import org.junit.Test;
 
-import java.util.List;
+import java.util.Set;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -40,13 +40,15 @@ public class FailureListenerUtilsTest {
 
     @Test
     public void testLoadDefaultFailureListener() {
-        List<FailureListener> failureListeners =
-                FailureListenerUtils.getFailureListerners(
+        final JobGraph jg = new JobGraph("Test");
+        Set<FailureListener> failureListeners =
+                FailureListenerUtils.getFailureListeners(
                         new Configuration(),
-                        UnregisteredJobManagerJobMetricGroupFactory.INSTANCE.create(
-                                new JobGraph("Test")));
+                        jg.getJobID(),
+                        jg.getName(),
+                        UnregisteredJobManagerJobMetricGroupFactory.INSTANCE.create(jg));
 
         assertEquals(1, failureListeners.size());
-        assertTrue(failureListeners.get(0) instanceof DefaultFailureListener);
+        assertTrue(failureListeners.iterator().next() instanceof DefaultFailureListener);
     }
 }
