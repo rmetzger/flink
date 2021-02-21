@@ -29,6 +29,7 @@ import org.apache.flink.runtime.akka.AkkaUtils;
 import org.apache.flink.runtime.blob.BlobWriter;
 import org.apache.flink.runtime.checkpoint.CheckpointRecoveryFactory;
 import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutor;
+import org.apache.flink.runtime.executiongraph.FailureListenerFactory;
 import org.apache.flink.runtime.executiongraph.JobStatusListener;
 import org.apache.flink.runtime.io.network.partition.JobMasterPartitionTracker;
 import org.apache.flink.runtime.jobgraph.JobGraph;
@@ -104,7 +105,8 @@ public final class DefaultSlotPoolServiceSchedulerFactory
             long initializationTimestamp,
             ComponentMainThreadExecutor mainThreadExecutor,
             FatalErrorHandler fatalErrorHandler,
-            JobStatusListener jobStatusListener)
+            JobStatusListener jobStatusListener,
+            FailureListenerFactory failureListenerFactory)
             throws Exception {
         return schedulerNGFactory.createInstance(
                 log,
@@ -125,7 +127,8 @@ public final class DefaultSlotPoolServiceSchedulerFactory
                 initializationTimestamp,
                 mainThreadExecutor,
                 fatalErrorHandler,
-                jobStatusListener);
+                jobStatusListener,
+                failureListenerFactory);
     }
 
     public static DefaultSlotPoolServiceSchedulerFactory create(

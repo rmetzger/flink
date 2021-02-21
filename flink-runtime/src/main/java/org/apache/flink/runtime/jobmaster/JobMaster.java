@@ -23,6 +23,7 @@ import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.functions.AggregateFunction;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple2;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.JobManagerOptions;
 import org.apache.flink.queryablestate.KvStateID;
 import org.apache.flink.runtime.accumulators.AccumulatorSnapshot;
@@ -34,6 +35,7 @@ import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.execution.ExecutionState;
 import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
+import org.apache.flink.runtime.executiongraph.FailureListenerFactory;
 import org.apache.flink.runtime.executiongraph.JobStatusListener;
 import org.apache.flink.runtime.heartbeat.HeartbeatListener;
 import org.apache.flink.runtime.heartbeat.HeartbeatManager;
@@ -316,6 +318,7 @@ public class JobMaster extends PermanentlyFencedRpcEndpoint<JobMasterId>
         this.schedulerNG =
                 createScheduler(
                         slotPoolServiceSchedulerFactory,
+                        jobMasterConfiguration.getConfiguration(),
                         executionDeploymentTracker,
                         jobManagerJobMetricGroup,
                         jobStatusListener);
@@ -332,10 +335,14 @@ public class JobMaster extends PermanentlyFencedRpcEndpoint<JobMasterId>
 
     private SchedulerNG createScheduler(
             SlotPoolServiceSchedulerFactory slotPoolServiceSchedulerFactory,
+            Configuration configuration,
             ExecutionDeploymentTracker executionDeploymentTracker,
             JobManagerJobMetricGroup jobManagerJobMetricGroup,
             JobStatusListener jobStatusListener)
             throws Exception {
+
+        FailureListenerFactory failureListenerFactory = new FailureListenerFactory(configuration);
+
         final SchedulerNG scheduler =
                 slotPoolServiceSchedulerFactory.createScheduler(
                         log,
@@ -356,7 +363,8 @@ public class JobMaster extends PermanentlyFencedRpcEndpoint<JobMasterId>
                         initializationTimestamp,
                         getMainThreadExecutor(),
                         fatalErrorHandler,
-                        jobStatusListener);
+                        jobStatusListener,
+                        failureListenerFactory);
 
         return scheduler;
     }

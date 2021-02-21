@@ -30,6 +30,8 @@ import org.apache.flink.runtime.concurrent.ScheduledExecutor;
 import org.apache.flink.runtime.execution.ExecutionState;
 import org.apache.flink.runtime.executiongraph.ExecutionJobVertex;
 import org.apache.flink.runtime.executiongraph.ExecutionVertex;
+import org.apache.flink.runtime.executiongraph.FailureListener;
+import org.apache.flink.runtime.executiongraph.FailureListenerFactory;
 import org.apache.flink.runtime.executiongraph.JobStatusListener;
 import org.apache.flink.runtime.executiongraph.TaskExecutionStateTransition;
 import org.apache.flink.runtime.executiongraph.failover.flip1.ExecutionFailureHandler;
@@ -114,7 +116,8 @@ public class DefaultScheduler extends SchedulerBase implements SchedulerOperatio
             long initializationTimestamp,
             final ComponentMainThreadExecutor mainThreadExecutor,
             final JobStatusListener jobStatusListener,
-            final ExecutionGraphFactory executionGraphFactory)
+            final ExecutionGraphFactory executionGraphFactory,
+            final FailureListenerFactory failureListenerFactory)
             throws Exception {
 
         super(
@@ -149,6 +152,7 @@ public class DefaultScheduler extends SchedulerBase implements SchedulerOperatio
         this.executionFailureHandler =
                 new ExecutionFailureHandler(
                         getSchedulingTopology(), failoverStrategy, restartBackoffTimeStrategy);
+
         this.schedulingStrategy =
                 schedulingStrategyFactory.createInstance(this, getSchedulingTopology());
 
@@ -157,6 +161,14 @@ public class DefaultScheduler extends SchedulerBase implements SchedulerOperatio
                         .createInstance(new DefaultExecutionSlotAllocationContext());
 
         this.verticesWaitingForRestart = new HashSet<>();
+
+        List<FailureListener> listeners =
+                failureListenerFactory.createFailureListener(jobManagerJobMetricGroup);
+
+        for (FailureListener listener : listeners) {
+            executionFailureHandler.registerFailureListener(listener);
+        }
+
         startUpAction.accept(mainThreadExecutor);
     }
 

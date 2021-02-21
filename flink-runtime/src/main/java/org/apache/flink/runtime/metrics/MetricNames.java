@@ -50,6 +50,7 @@ public class MetricNames {
     public static final String NUM_REGISTERED_TASK_MANAGERS = "numRegisteredTaskManagers";
 
     public static final String NUM_RESTARTS = "numRestarts";
+    public static final String NUM_JOB_FAILURE = "numJobFailure";
 
     @Deprecated public static final String FULL_RESTARTS = "fullRestarts";
 
