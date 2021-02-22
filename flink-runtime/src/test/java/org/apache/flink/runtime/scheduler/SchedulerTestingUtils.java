@@ -570,15 +570,8 @@ public class SchedulerTestingUtils {
                     System.currentTimeMillis(),
                     mainThreadExecutor,
                     jobStatusListener,
-<<<<<<< HEAD
-<<<<<<< HEAD
-                    executionGraphFactory);
-=======
-                    failureListenerFactory);
->>>>>>> 7832ad11fe... [FLINK-20833][runtime] Add pluginable failure listener
-=======
+                    executionGraphFactory,
                     failureListeners);
->>>>>>> 254966e55f... resolve zentol's comments
         }
     }
 }

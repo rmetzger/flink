@@ -23,7 +23,6 @@ import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.functions.AggregateFunction;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.JobManagerOptions;
 import org.apache.flink.core.failurelistener.FailureListener;
 import org.apache.flink.queryablestate.KvStateID;
@@ -327,7 +326,6 @@ public class JobMaster extends PermanentlyFencedRpcEndpoint<JobMasterId>
         this.schedulerNG =
                 createScheduler(
                         slotPoolServiceSchedulerFactory,
-                        jobMasterConfiguration.getConfiguration(),
                         executionDeploymentTracker,
                         jobManagerJobMetricGroup,
                         jobStatusListener,
@@ -345,7 +343,6 @@ public class JobMaster extends PermanentlyFencedRpcEndpoint<JobMasterId>
 
     private SchedulerNG createScheduler(
             SlotPoolServiceSchedulerFactory slotPoolServiceSchedulerFactory,
-            Configuration configuration,
             ExecutionDeploymentTracker executionDeploymentTracker,
             JobManagerJobMetricGroup jobManagerJobMetricGroup,
             JobStatusListener jobStatusListener,

@@ -116,7 +116,7 @@ public class DefaultScheduler extends SchedulerBase implements SchedulerOperatio
             final ComponentMainThreadExecutor mainThreadExecutor,
             final JobStatusListener jobStatusListener,
             final ExecutionGraphFactory executionGraphFactory,
-            final List<FailureListener> failureListeners)
+            final Set<FailureListener> failureListeners)
             throws Exception {
 
         super(

@@ -25,11 +25,11 @@ import org.apache.flink.configuration.ClusterOptions;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.JobManagerOptions;
 import org.apache.flink.configuration.SchedulerExecutionMode;
+import org.apache.flink.core.failurelistener.FailureListener;
 import org.apache.flink.runtime.akka.AkkaUtils;
 import org.apache.flink.runtime.blob.BlobWriter;
 import org.apache.flink.runtime.checkpoint.CheckpointRecoveryFactory;
 import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutor;
-import org.apache.flink.runtime.executiongraph.FailureListenerFactory;
 import org.apache.flink.runtime.executiongraph.JobStatusListener;
 import org.apache.flink.runtime.io.network.partition.JobMasterPartitionTracker;
 import org.apache.flink.runtime.jobgraph.JobGraph;
@@ -51,6 +51,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
+import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 
 /** Default {@link SlotPoolServiceSchedulerFactory} implementation. */
@@ -106,7 +107,7 @@ public final class DefaultSlotPoolServiceSchedulerFactory
             ComponentMainThreadExecutor mainThreadExecutor,
             FatalErrorHandler fatalErrorHandler,
             JobStatusListener jobStatusListener,
-            FailureListenerFactory failureListenerFactory)
+            Set<FailureListener> failureListeners)
             throws Exception {
         return schedulerNGFactory.createInstance(
                 log,
@@ -128,7 +129,7 @@ public final class DefaultSlotPoolServiceSchedulerFactory
                 mainThreadExecutor,
                 fatalErrorHandler,
                 jobStatusListener,
-                failureListenerFactory);
+                failureListeners);
     }
 
     public static DefaultSlotPoolServiceSchedulerFactory create(
