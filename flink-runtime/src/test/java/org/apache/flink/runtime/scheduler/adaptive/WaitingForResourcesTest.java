@@ -31,6 +31,7 @@ import org.apache.flink.util.TestLogger;
 import org.apache.flink.util.function.SupplierWithException;
 
 import org.junit.Test;
+import org.slf4j.Logger;
 
 import javax.annotation.Nullable;
 
@@ -50,15 +51,18 @@ public class WaitingForResourcesTest extends TestLogger {
     private static final ResourceCounter RESOURCE_COUNTER =
             ResourceCounter.withResource(ResourceProfile.UNKNOWN, 1);
 
+    private static final Duration STABILIZATION_TIMEOUT = Duration.ofSeconds(1);
+
     /** WaitingForResources is transitioning to Executing if there are enough resources. */
     @Test
     public void testTransitionToExecuting() throws Exception {
         try (MockContext ctx = new MockContext()) {
-            ctx.setHasEnoughResources(() -> true);
+            ctx.setHasDesiredResources(() -> true);
 
             ctx.setExpectExecuting(assertNonNull());
 
-            new WaitingForResources(ctx, log, RESOURCE_COUNTER, Duration.ZERO);
+            new WaitingForResources(
+                    ctx, log, RESOURCE_COUNTER, Duration.ZERO, STABILIZATION_TIMEOUT);
             // run delayed actions
             for (ScheduledRunnable scheduledRunnable : ctx.getScheduledRunnables()) {
                 scheduledRunnable.runAction();
@@ -72,7 +76,7 @@ public class WaitingForResourcesTest extends TestLogger {
     @Test
     public void testTransitionToFinishedOnExecutionGraphInitializationFailure() throws Exception {
         try (MockContext ctx = new MockContext()) {
-            ctx.setHasEnoughResources(() -> true);
+            ctx.setHasDesiredResources(() -> true);
             ctx.setCreateExecutionGraphWithAvailableResources(
                     () -> {
                         throw new RuntimeException("Test exception");
@@ -83,7 +87,8 @@ public class WaitingForResourcesTest extends TestLogger {
                         assertThat(archivedExecutionGraph.getState(), is(JobStatus.FAILED));
                     }));
 
-            new WaitingForResources(ctx, log, RESOURCE_COUNTER, Duration.ZERO);
+            new WaitingForResources(
+                    ctx, log, RESOURCE_COUNTER, Duration.ZERO, STABILIZATION_TIMEOUT);
 
             // run delayed actions
             for (ScheduledRunnable scheduledRunnable : ctx.getScheduledRunnables()) {
@@ -97,9 +102,10 @@ public class WaitingForResourcesTest extends TestLogger {
     @Test
     public void testNotEnoughResources() throws Exception {
         try (MockContext ctx = new MockContext()) {
-            ctx.setHasEnoughResources(() -> false);
+            ctx.setHasDesiredResources(() -> false);
             WaitingForResources wfr =
-                    new WaitingForResources(ctx, log, RESOURCE_COUNTER, Duration.ZERO);
+                    new WaitingForResources(
+                            ctx, log, RESOURCE_COUNTER, Duration.ZERO, STABILIZATION_TIMEOUT);
 
             // we expect no state transition.
             wfr.notifyNewResourcesAvailable();
@@ -109,28 +115,138 @@ public class WaitingForResourcesTest extends TestLogger {
     @Test
     public void testNotifyNewResourcesAvailable() throws Exception {
         try (MockContext ctx = new MockContext()) {
-            ctx.setHasEnoughResources(() -> false); // initially, not enough resources
+            ctx.setHasDesiredResources(() -> false); // initially, not enough resources
             WaitingForResources wfr =
-                    new WaitingForResources(ctx, log, RESOURCE_COUNTER, Duration.ZERO);
-            ctx.setHasEnoughResources(() -> true); // make resources available
+                    new WaitingForResources(
+                            ctx, log, RESOURCE_COUNTER, Duration.ZERO, STABILIZATION_TIMEOUT);
+            ctx.setHasDesiredResources(() -> true); // make resources available
             ctx.setExpectExecuting(assertNonNull());
             wfr.notifyNewResourcesAvailable(); // .. and notify
         }
     }
 
     @Test
-    public void testNoStateTransitionOnNoResourceTimeout() throws Exception {
+    public void testSchedulingWithSufficientResourcesAndNoStabilizationTimeout() throws Exception {
         try (MockContext ctx = new MockContext()) {
-            ctx.setHasEnoughResources(() -> false);
-            WaitingForResources wfr =
-                    new WaitingForResources(ctx, log, RESOURCE_COUNTER, Duration.ofMillis(-1));
 
-            // execute all scheduled runnables
+            Duration noStabilizationTimeout = Duration.ofMillis(0);
+            WaitingForResources wfr =
+                    new WaitingForResources(
+                            ctx,
+                            log,
+                            RESOURCE_COUNTER,
+                            Duration.ofSeconds(1000),
+                            noStabilizationTimeout);
+
+            ctx.setHasDesiredResources(() -> false);
+            ctx.setHasSufficientResources(() -> true);
+            ctx.setExpectExecuting(assertNonNull());
+            wfr.notifyNewResourcesAvailable();
+        }
+    }
+
+    @Test
+    public void testNoSchedulingIfStabilizationTimeoutIsConfigured() throws Exception {
+        try (MockContext ctx = new MockContext()) {
+
+            Duration stabilizationTimeout = Duration.ofMillis(50000);
+
+            WaitingForResources wfr =
+                    new WaitingForResources(
+                            ctx,
+                            log,
+                            RESOURCE_COUNTER,
+                            Duration.ofSeconds(1000),
+                            stabilizationTimeout);
+
+            ctx.setHasDesiredResources(() -> false);
+            ctx.setHasSufficientResources(() -> true);
+            wfr.notifyNewResourcesAvailable();
+            // we are not triggering the scheduled tasks, to simulate a long stabilization timeout
+
+            assertThat(ctx.hasStateTransition(), is(false));
+        }
+    }
+
+    @Test
+    public void testSchedulingIfStabilizationTimeoutIsConfigured() throws Exception {
+        try (MockContext ctx = new MockContext()) {
+
+            Duration initialResourceTimeout = Duration.ofMillis(120948);
+            Duration stabilizationTimeout = Duration.ofMillis(50000);
+
+            TestingWaitingForResources wfr =
+                    new TestingWaitingForResources(
+                            ctx,
+                            log,
+                            RESOURCE_COUNTER,
+                            initialResourceTimeout,
+                            stabilizationTimeout);
+
+            ctx.setHasDesiredResources(() -> false);
+            ctx.setHasSufficientResources(() -> true);
+            wfr.setStabilizationTimeoutOver(false);
+
+            ctx.setExpectExecuting(assertNonNull());
+            wfr.notifyNewResourcesAvailable();
+
+            wfr.setStabilizationTimeoutOver(true);
+
+            // we are executing all scheduled runnables, except those with the
+            // initialResourceTimeout or a ZERO timeout to make sure we are testing the
+            // stabilization timeout
             for (ScheduledRunnable scheduledRunnable : ctx.getScheduledRunnables()) {
-                if (scheduledRunnable.getExpectedState() == wfr) {
+                if (scheduledRunnable.getExpectedState() == wfr
+                        && !scheduledRunnable.getDelay().equals(initialResourceTimeout)
+                        && !scheduledRunnable.getDelay().equals(Duration.ZERO)) {
                     scheduledRunnable.runAction();
                 }
             }
+        }
+    }
+
+    private static class TestingWaitingForResources extends WaitingForResources {
+
+        private boolean timeout = false;
+
+        TestingWaitingForResources(
+                Context context,
+                Logger log,
+                ResourceCounter desiredResources,
+                Duration initialResourceAllocationTimeout,
+                Duration resourceStabilizationTimeout) {
+            super(
+                    context,
+                    log,
+                    desiredResources,
+                    initialResourceAllocationTimeout,
+                    resourceStabilizationTimeout);
+        }
+
+        @Override
+        protected boolean isResourceStabilizationDeadlineOverdue() {
+            return timeout;
+        }
+
+        public void setStabilizationTimeoutOver(boolean timeout) {
+            this.timeout = timeout;
+        }
+    }
+
+    @Test
+    public void testNoStateTransitionOnNoResourceTimeout() throws Exception {
+        try (MockContext ctx = new MockContext()) {
+            ctx.setHasDesiredResources(() -> false);
+            WaitingForResources wfr =
+                    new WaitingForResources(
+                            ctx,
+                            log,
+                            RESOURCE_COUNTER,
+                            Duration.ofMillis(-1),
+                            STABILIZATION_TIMEOUT);
+
+            executeAllScheduledRunnables(ctx, wfr);
+
             assertThat(ctx.hasStateTransition(), is(false));
         }
     }
@@ -138,18 +254,14 @@ public class WaitingForResourcesTest extends TestLogger {
     @Test
     public void testStateTransitionOnResourceTimeout() throws Exception {
         try (MockContext ctx = new MockContext()) {
-            ctx.setHasEnoughResources(() -> false);
+            ctx.setHasDesiredResources(() -> false);
             WaitingForResources wfr =
-                    new WaitingForResources(ctx, log, RESOURCE_COUNTER, Duration.ZERO);
+                    new WaitingForResources(
+                            ctx, log, RESOURCE_COUNTER, Duration.ZERO, STABILIZATION_TIMEOUT);
 
             ctx.setExpectExecuting(assertNonNull());
 
-            // execute all scheduled runnables
-            for (ScheduledRunnable scheduledRunnable : ctx.getScheduledRunnables()) {
-                if (scheduledRunnable.getExpectedState() == wfr) {
-                    scheduledRunnable.runAction();
-                }
-            }
+            executeAllScheduledRunnables(ctx, wfr);
         }
     }
 
@@ -157,9 +269,10 @@ public class WaitingForResourcesTest extends TestLogger {
     public void testTransitionToFinishedOnGlobalFailure() throws Exception {
         final String testExceptionString = "This is a test exception";
         try (MockContext ctx = new MockContext()) {
-            ctx.setHasEnoughResources(() -> false);
+            ctx.setHasDesiredResources(() -> false);
             WaitingForResources wfr =
-                    new WaitingForResources(ctx, log, RESOURCE_COUNTER, Duration.ZERO);
+                    new WaitingForResources(
+                            ctx, log, RESOURCE_COUNTER, Duration.ZERO, STABILIZATION_TIMEOUT);
 
             ctx.setExpectFinished(
                     archivedExecutionGraph -> {
@@ -179,9 +292,10 @@ public class WaitingForResourcesTest extends TestLogger {
     @Test
     public void testCancel() throws Exception {
         try (MockContext ctx = new MockContext()) {
-            ctx.setHasEnoughResources(() -> false);
+            ctx.setHasDesiredResources(() -> false);
             WaitingForResources wfr =
-                    new WaitingForResources(ctx, log, RESOURCE_COUNTER, Duration.ZERO);
+                    new WaitingForResources(
+                            ctx, log, RESOURCE_COUNTER, Duration.ZERO, STABILIZATION_TIMEOUT);
 
             ctx.setExpectFinished(
                     (archivedExecutionGraph -> {
@@ -194,9 +308,10 @@ public class WaitingForResourcesTest extends TestLogger {
     @Test
     public void testSuspend() throws Exception {
         try (MockContext ctx = new MockContext()) {
-            ctx.setHasEnoughResources(() -> false);
+            ctx.setHasDesiredResources(() -> false);
             WaitingForResources wfr =
-                    new WaitingForResources(ctx, log, RESOURCE_COUNTER, Duration.ZERO);
+                    new WaitingForResources(
+                            ctx, log, RESOURCE_COUNTER, Duration.ZERO, STABILIZATION_TIMEOUT);
 
             ctx.setExpectFinished(
                     (archivedExecutionGraph -> {
@@ -208,6 +323,14 @@ public class WaitingForResourcesTest extends TestLogger {
         }
     }
 
+    private void executeAllScheduledRunnables(MockContext ctx, WaitingForResources expectedState) {
+        for (ScheduledRunnable scheduledRunnable : ctx.getScheduledRunnables()) {
+            if (scheduledRunnable.getExpectedState() == expectedState) {
+                scheduledRunnable.runAction();
+            }
+        }
+    }
+
     private static class MockContext implements WaitingForResources.Context, AutoCloseable {
 
         private final StateValidator<ExecutionGraph> executingStateValidator =
@@ -215,7 +338,9 @@ public class WaitingForResourcesTest extends TestLogger {
         private final StateValidator<ArchivedExecutionGraph> finishedStateValidator =
                 new StateValidator<>("finished");
 
-        private Supplier<Boolean> hasEnoughResourcesSupplier = () -> false;
+        private Supplier<Boolean> hasDesiredResourcesSupplier = () -> false;
+        private Supplier<Boolean> hasSufficientResourcesSupplier = () -> false;
+
         private SupplierWithException<ExecutionGraph, FlinkException>
                 createExecutionGraphWithAvailableResources =
                         () -> TestingDefaultExecutionGraphBuilder.newBuilder().build();
@@ -226,8 +351,12 @@ public class WaitingForResourcesTest extends TestLogger {
             return scheduledRunnables;
         }
 
-        public void setHasEnoughResources(Supplier<Boolean> sup) {
-            hasEnoughResourcesSupplier = sup;
+        public void setHasDesiredResources(Supplier<Boolean> sup) {
+            hasDesiredResourcesSupplier = sup;
+        }
+
+        public void setHasSufficientResources(Supplier<Boolean> sup) {
+            hasSufficientResourcesSupplier = sup;
         }
 
         public void setCreateExecutionGraphWithAvailableResources(
@@ -259,8 +388,13 @@ public class WaitingForResourcesTest extends TestLogger {
         }
 
         @Override
-        public boolean hasEnoughResources(ResourceCounter desiredResources) {
-            return hasEnoughResourcesSupplier.get();
+        public boolean hasDesiredResources(ResourceCounter desiredResources) {
+            return hasDesiredResourcesSupplier.get();
+        }
+
+        @Override
+        public boolean hasSufficientResources() {
+            return hasSufficientResourcesSupplier.get();
         }
 
         @Override
@@ -307,6 +441,10 @@ public class WaitingForResourcesTest extends TestLogger {
 
         public State getExpectedState() {
             return expectedState;
+        }
+
+        public Duration getDelay() {
+            return delay;
         }
     }
 

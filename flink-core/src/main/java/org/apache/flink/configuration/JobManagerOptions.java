@@ -405,7 +405,7 @@ public class JobManagerOptions {
                     .withDescription(
                             Description.builder()
                                     .text(
-                                            "The maximum time the JobManager will wait to acquire all required resources after a job submission or restart. "
+                                            "The maximum time the JobManager will wait initially to acquire all required resources after a job submission or restart. "
                                                     + "Once elapsed it will try to run the job with a lower parallelism, or fail if the minimum amount of resources could not be acquired.")
                                     .linebreak()
                                     .text(
@@ -414,6 +414,22 @@ public class JobManagerOptions {
                                     .linebreak()
                                     .text(
                                             "Setting a negative duration will disable the resource timeout: The JobManager will wait indefinitely for resouces to appear")
+                                    .build());
+
+    @Documentation.Section({
+        Documentation.Sections.EXPERT_SCHEDULING,
+        Documentation.Sections.ALL_JOB_MANAGER
+    })
+    public static final ConfigOption<Duration> RESOURCE_STABILIZATION_TIMEOUT =
+            key("jobmanager.adaptive-scheduler.resource-stabilization-timeout")
+                    .durationType()
+                    .defaultValue(RESOURCE_WAIT_TIMEOUT.defaultValue())
+                    .withDescription(
+                            Description.builder()
+                                    .text(
+                                            "The resource stabilization timeout defines the time the JobManager will wait "
+                                                    + "if fewer than the required resources are available, but sufficient resources for execution are there."
+                                                    + "Once this timeout has passed, the job will start executing with the available resources, or fail, if the resources are not sufficient.")
                                     .build());
 
     /**

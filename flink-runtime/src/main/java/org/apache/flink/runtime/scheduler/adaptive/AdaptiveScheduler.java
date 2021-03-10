@@ -188,7 +188,9 @@ public class AdaptiveScheduler
 
     private final ScaleUpController scaleUpController;
 
-    private final Duration resourceTimeout;
+    private final Duration initialResourceAllocationTimeout;
+
+    private Duration resourceStabilizationTimeout;
 
     private State state = new Created(this, LOG);
 
@@ -258,7 +260,11 @@ public class AdaptiveScheduler
 
         this.scaleUpController = new ReactiveScaleUpController(configuration);
 
-        this.resourceTimeout = configuration.get(JobManagerOptions.RESOURCE_WAIT_TIMEOUT);
+        this.initialResourceAllocationTimeout =
+                configuration.get(JobManagerOptions.RESOURCE_WAIT_TIMEOUT);
+
+        this.resourceStabilizationTimeout =
+                configuration.get(JobManagerOptions.RESOURCE_STABILIZATION_TIMEOUT);
 
         registerMetrics();
     }
@@ -551,7 +557,7 @@ public class AdaptiveScheduler
     // ----------------------------------------------------------------
 
     @Override
-    public boolean hasEnoughResources(ResourceCounter desiredResources) {
+    public boolean hasDesiredResources(ResourceCounter desiredResources) {
         final Collection<? extends SlotInfo> allSlots =
                 declarativeSlotPool.getFreeSlotsInformation();
         ResourceCounter outstandingResources = desiredResources;
@@ -570,6 +576,13 @@ public class AdaptiveScheduler
         }
 
         return outstandingResources.isEmpty();
+    }
+
+    @Override
+    public boolean hasSufficientResources() {
+        return slotAllocator
+                .determineParallelism(jobInformation, declarativeSlotPool.getAllSlotsInformation())
+                .isPresent();
     }
 
     private <T extends VertexParallelism>
@@ -715,7 +728,12 @@ public class AdaptiveScheduler
         declarativeSlotPool.setResourceRequirements(desiredResources);
 
         transitionToState(
-                new WaitingForResources.Factory(this, LOG, desiredResources, this.resourceTimeout));
+                new WaitingForResources.Factory(
+                        this,
+                        LOG,
+                        desiredResources,
+                        this.initialResourceAllocationTimeout,
+                        this.resourceStabilizationTimeout));
     }
 
     private ResourceCounter calculateDesiredResources() {
