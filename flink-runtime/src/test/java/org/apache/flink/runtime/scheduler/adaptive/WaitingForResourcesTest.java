@@ -42,7 +42,6 @@ import java.util.function.Supplier;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.notNullValue;
-import static org.hamcrest.Matchers.greaterThan;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
@@ -120,7 +119,24 @@ public class WaitingForResourcesTest extends TestLogger {
     }
 
     @Test
-    public void testResourceTimeout() throws Exception {
+    public void testNoStateTransitionOnNoResourceTimeout() throws Exception {
+        try (MockContext ctx = new MockContext()) {
+            ctx.setHasEnoughResources(() -> false);
+            WaitingForResources wfr =
+                    new WaitingForResources(ctx, log, RESOURCE_COUNTER, Duration.ofMillis(-1));
+
+            // execute all scheduled runnables
+            for (ScheduledRunnable scheduledRunnable : ctx.getScheduledRunnables()) {
+                if (scheduledRunnable.getExpectedState() == wfr) {
+                    scheduledRunnable.runAction();
+                }
+            }
+            assertThat(ctx.hasStateTransition(), is(false));
+        }
+    }
+
+    @Test
+    public void testStateTransitionOnResourceTimeout() throws Exception {
         try (MockContext ctx = new MockContext()) {
             ctx.setHasEnoughResources(() -> false);
             WaitingForResources wfr =
@@ -128,8 +144,7 @@ public class WaitingForResourcesTest extends TestLogger {
 
             ctx.setExpectExecuting(assertNonNull());
 
-            // immediately execute all scheduled runnables
-            assertThat(ctx.getScheduledRunnables().size(), greaterThan(0));
+            // execute all scheduled runnables
             for (ScheduledRunnable scheduledRunnable : ctx.getScheduledRunnables()) {
                 if (scheduledRunnable.getExpectedState() == wfr) {
                     scheduledRunnable.runAction();

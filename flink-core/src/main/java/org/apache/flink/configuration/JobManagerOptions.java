@@ -411,6 +411,9 @@ public class JobManagerOptions {
                                     .text(
                                             "Increasing this value will make the cluster more resilient against temporary resources shortages (e.g., there is more time for a failed TaskManager to be restarted), "
                                                     + "while decreasing this value reduces downtime of a job (provided that enough slots are available to still run the job).")
+                                    .linebreak()
+                                    .text(
+                                            "Setting a negative duration will disable the resource timeout: The JobManager will wait indefinitely for resouces to appear")
                                     .build());
 
     /**

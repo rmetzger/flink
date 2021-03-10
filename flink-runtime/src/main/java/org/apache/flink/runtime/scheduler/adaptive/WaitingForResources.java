@@ -53,8 +53,10 @@ class WaitingForResources implements State, ResourceConsumer {
                 !desiredResources.isEmpty(), "Desired resources must not be empty");
 
         // since state transitions are not allowed in state constructors, schedule calls for later.
-        context.runIfState(
-                this, this::resourceTimeout, Preconditions.checkNotNull(resourceTimeout));
+        if (!resourceTimeout.isNegative()) {
+            context.runIfState(
+                    this, this::resourceTimeout, Preconditions.checkNotNull(resourceTimeout));
+        }
         context.runIfState(this, this::notifyNewResourcesAvailable, Duration.ZERO);
     }
 
