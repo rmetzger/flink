@@ -20,7 +20,6 @@ package org.apache.flink.runtime.scheduler.adaptive;
 
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.runtime.JobException;
-import org.apache.flink.runtime.checkpoint.CheckpointScheduling;
 import org.apache.flink.runtime.checkpoint.CompletedCheckpoint;
 import org.apache.flink.runtime.execution.ExecutionState;
 import org.apache.flink.runtime.executiongraph.ArchivedExecutionGraph;
@@ -159,8 +158,6 @@ class Executing extends StateWithExecutionGraph implements ResourceConsumer {
 
         getLogger().info("Triggering stop-with-savepoint for job {}.", executionGraph.getJobID());
 
-        final CheckpointScheduling checkpointScheduling =
-                new CheckpointSchedulingProvider(executionGraph);
         final CompletableFuture<String> savepointFuture =
                 executionGraph
                         .getCheckpointCoordinator()
@@ -170,7 +167,6 @@ class Executing extends StateWithExecutionGraph implements ResourceConsumer {
                 executionGraph,
                 getExecutionGraphHandler(),
                 getOperatorCoordinatorHandler(),
-                checkpointScheduling,
                 savepointFuture);
     }
 
@@ -253,7 +249,6 @@ class Executing extends StateWithExecutionGraph implements ResourceConsumer {
                 ExecutionGraph executionGraph,
                 ExecutionGraphHandler executionGraphHandler,
                 OperatorCoordinatorHandler operatorCoordinatorHandler,
-                CheckpointScheduling checkpointScheduling,
                 CompletableFuture<String> savepointFuture);
     }
 

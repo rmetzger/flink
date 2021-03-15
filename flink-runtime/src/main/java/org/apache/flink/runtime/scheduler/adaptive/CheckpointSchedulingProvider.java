@@ -26,7 +26,8 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.apache.flink.util.Preconditions.checkState;
 
 /**
- * Provide {@link CheckpointCoordinator} related operations for the stop with savepoint operation.
+ * Provide {@link CheckpointCoordinator} related operations for the {@link StopWithSavepoint}
+ * operation.
  */
 class CheckpointSchedulingProvider implements CheckpointScheduling {
     private final ExecutionGraph executionGraph;

@@ -367,7 +367,7 @@ public class ExecutingTest extends TestLogger {
                 new StateValidator<>("failing");
         private final StateValidator<RestartingArguments> restartingStateValidator =
                 new StateValidator<>("restarting");
-        private final StateValidator<CancellingArguments> cancellingStateValidator =
+        private final StateValidator<ExecutingAndCancellingArguments> cancellingStateValidator =
                 new StateValidator<>("cancelling");
 
         private Function<Throwable, Executing.FailureResult> howToHandleFailure;
@@ -385,7 +385,7 @@ public class ExecutingTest extends TestLogger {
             restartingStateValidator.expectInput(asserter);
         }
 
-        public void setExpectCancelling(Consumer<CancellingArguments> asserter) {
+        public void setExpectCancelling(Consumer<ExecutingAndCancellingArguments> asserter) {
             cancellingStateValidator.expectInput(asserter);
         }
 
@@ -409,7 +409,7 @@ public class ExecutingTest extends TestLogger {
                 ExecutionGraphHandler executionGraphHandler,
                 OperatorCoordinatorHandler operatorCoordinatorHandler) {
             cancellingStateValidator.validateInput(
-                    new CancellingArguments(
+                    new ExecutingAndCancellingArguments(
                             executionGraph, executionGraphHandler, operatorCoordinatorHandler));
             hadStateTransition = true;
         }
@@ -459,14 +459,13 @@ public class ExecutingTest extends TestLogger {
                 ExecutionGraph executionGraph,
                 ExecutionGraphHandler executionGraphHandler,
                 OperatorCoordinatorHandler operatorCoordinatorHandler,
-                CheckpointScheduling checkpointScheduling,
                 CompletableFuture<String> savepointFuture) {
             stopWithSavepointValidator.validateInput(
                     new StopWithSavepointArguments(
                             executionGraph,
                             executionGraphHandler,
                             operatorCoordinatorHandler,
-                            checkpointScheduling,
+                            new CheckpointSchedulingProvider(executionGraph),
                             savepointFuture));
             hadStateTransition = true;
             return mockedStopWithSavepointOperationFuture;
@@ -482,12 +481,12 @@ public class ExecutingTest extends TestLogger {
         }
     }
 
-    static class CancellingArguments {
+    static class ExecutingAndCancellingArguments {
         private final ExecutionGraph executionGraph;
         private final ExecutionGraphHandler executionGraphHandler;
         private final OperatorCoordinatorHandler operatorCoordinatorHandle;
 
-        public CancellingArguments(
+        public ExecutingAndCancellingArguments(
                 ExecutionGraph executionGraph,
                 ExecutionGraphHandler executionGraphHandler,
                 OperatorCoordinatorHandler operatorCoordinatorHandle) {
@@ -509,7 +508,7 @@ public class ExecutingTest extends TestLogger {
         }
     }
 
-    static class StopWithSavepointArguments extends CancellingArguments {
+    static class StopWithSavepointArguments extends ExecutingAndCancellingArguments {
         private final CheckpointScheduling checkpointScheduling;
         private final CompletableFuture<String> savepointFuture;
 
@@ -525,7 +524,7 @@ public class ExecutingTest extends TestLogger {
         }
     }
 
-    static class RestartingArguments extends CancellingArguments {
+    static class RestartingArguments extends ExecutingAndCancellingArguments {
         private final Duration backoffTime;
 
         public RestartingArguments(
@@ -542,7 +541,7 @@ public class ExecutingTest extends TestLogger {
         }
     }
 
-    static class FailingArguments extends CancellingArguments {
+    static class FailingArguments extends ExecutingAndCancellingArguments {
         private final Throwable failureCause;
 
         public FailingArguments(

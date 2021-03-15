@@ -19,6 +19,7 @@
 package org.apache.flink.runtime.scheduler.adaptive;
 
 import org.apache.flink.api.common.JobStatus;
+import org.apache.flink.runtime.checkpoint.CheckpointCoordinator;
 import org.apache.flink.runtime.checkpoint.CheckpointScheduling;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.execution.ExecutionState;
@@ -28,6 +29,7 @@ import org.apache.flink.runtime.executiongraph.TaskExecutionStateTransition;
 import org.apache.flink.runtime.scheduler.ExecutionGraphHandler;
 import org.apache.flink.runtime.scheduler.OperatorCoordinatorHandler;
 import org.apache.flink.util.FlinkException;
+import org.apache.flink.util.Preconditions;
 
 import org.slf4j.Logger;
 
@@ -37,8 +39,14 @@ import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * When a "stop with savepoint" operation (wait until savepoint has been created, then cancel job)
- * is triggered on the {@link Executing} state, we transition into this state.
+ * Tracks a "stop with savepoint" operation. The incoming "savepointFuture" is coming from the
+ * {@link CheckpointCoordinator}, which takes care of triggering a savepoint, and then shutting down
+ * the job (on success).
+ *
+ * <p>This state is tracking the future to act accordingly on it. The savepoint path (= the result
+ * of the operation) is made available via the "operationFuture" to the user. This operation is only
+ * considered successfully if the "savepointFuture" completed successfully, and the job reached the
+ * terminal state FINISHED.
  */
 class StopWithSavepoint extends StateWithExecutionGraph {
 
@@ -52,6 +60,8 @@ class StopWithSavepoint extends StateWithExecutionGraph {
     private boolean hasFullyFinished = false;
 
     @Nullable private String savepoint = null;
+
+    @Nullable private Throwable operationFailureCause;
 
     StopWithSavepoint(
             Context context,
@@ -81,20 +91,14 @@ class StopWithSavepoint extends StateWithExecutionGraph {
 
     private void handleSavepointCompletion(
             @Nullable String savepoint, @Nullable Throwable throwable) {
-
         if (hasFullyFinished) {
-            if (throwable != null) {
-                throw new IllegalStateException(
-                        "A savepoint should never fail after a job has been terminated via stop-with-savepoint.");
-            } else {
-                completeOperationAndGoToFinished(savepoint);
-            }
+            Preconditions.checkState(
+                    throwable == null,
+                    "A savepoint should never fail after a job has been terminated via stop-with-savepoint.");
+            completeOperationAndGoToFinished(savepoint);
         } else {
             if (throwable != null) {
-                getLogger()
-                        .warn(
-                                "Continuing execution because creating the savepoint failed with",
-                                throwable);
+                operationFailureCause = throwable;
                 checkpointScheduling.startCheckpointScheduler();
                 context.goToExecuting(
                         getExecutionGraph(),
@@ -109,7 +113,9 @@ class StopWithSavepoint extends StateWithExecutionGraph {
     @Override
     public void onLeave(Class<? extends State> newState) {
         this.operationFuture.completeExceptionally(
-                new FlinkException("Stop with savepoint operation could not be completed."));
+                new FlinkException(
+                        "Stop with savepoint operation could not be completed.",
+                        operationFailureCause));
 
         super.onLeave(newState);
     }
@@ -164,6 +170,7 @@ class StopWithSavepoint extends StateWithExecutionGraph {
     }
 
     private void handleAnyFailure(Throwable cause) {
+        operationFailureCause = cause;
         final Executing.FailureResult failureResult = context.howToHandleFailure(cause);
 
         if (failureResult.canRestart()) {
