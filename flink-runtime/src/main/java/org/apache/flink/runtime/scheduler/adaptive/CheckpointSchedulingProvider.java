@@ -19,13 +19,8 @@
 package org.apache.flink.runtime.scheduler.adaptive;
 
 import org.apache.flink.runtime.checkpoint.CheckpointCoordinator;
-import org.apache.flink.runtime.checkpoint.CompletedCheckpoint;
-import org.apache.flink.runtime.checkpoint.StopWithSavepointOperations;
+import org.apache.flink.runtime.checkpoint.CheckpointScheduling;
 import org.apache.flink.runtime.executiongraph.ExecutionGraph;
-
-import javax.annotation.Nullable;
-
-import java.util.concurrent.CompletableFuture;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.apache.flink.util.Preconditions.checkState;
@@ -33,10 +28,10 @@ import static org.apache.flink.util.Preconditions.checkState;
 /**
  * Provide {@link CheckpointCoordinator} related operations for the stop with savepoint operation.
  */
-class StopWithSavepointOperationsProvider implements StopWithSavepointOperations {
+class CheckpointSchedulingProvider implements CheckpointScheduling {
     private final ExecutionGraph executionGraph;
 
-    StopWithSavepointOperationsProvider(ExecutionGraph executionGraph) {
+    CheckpointSchedulingProvider(ExecutionGraph executionGraph) {
         this.executionGraph = checkNotNull(executionGraph, "executionGraph must not be null");
     }
 
@@ -64,16 +59,5 @@ class StopWithSavepointOperationsProvider implements StopWithSavepointOperations
         if (coordinator != null) {
             coordinator.stopCheckpointScheduler();
         }
-    }
-
-    @Override
-    public CompletableFuture<CompletedCheckpoint> triggerSynchronousSavepoint(
-            boolean terminate, @Nullable String targetLocation) {
-        checkNotNull(
-                executionGraph.getCheckpointCoordinator(),
-                "Checkpoint coordinator must be set for this operation. Is this a streaming job?");
-        return executionGraph
-                .getCheckpointCoordinator()
-                .triggerSynchronousSavepoint(terminate, targetLocation);
     }
 }

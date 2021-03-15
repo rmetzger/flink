@@ -19,7 +19,7 @@
 package org.apache.flink.runtime.scheduler.adaptive;
 
 import org.apache.flink.api.common.JobStatus;
-import org.apache.flink.runtime.checkpoint.StopWithSavepointOperations;
+import org.apache.flink.runtime.checkpoint.CheckpointScheduling;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.execution.ExecutionState;
 import org.apache.flink.runtime.executiongraph.ArchivedExecutionGraph;
@@ -47,7 +47,7 @@ class StopWithSavepoint extends StateWithExecutionGraph {
 
     private final CompletableFuture<String> operationFuture;
 
-    private final StopWithSavepointOperations stopWithSavepointOperations;
+    private final CheckpointScheduling checkpointScheduling;
 
     private boolean hasFullyFinished = false;
 
@@ -58,14 +58,14 @@ class StopWithSavepoint extends StateWithExecutionGraph {
             ExecutionGraph executionGraph,
             ExecutionGraphHandler executionGraphHandler,
             OperatorCoordinatorHandler operatorCoordinatorHandler,
-            StopWithSavepointOperations stopWithSavepointOperations,
+            CheckpointScheduling checkpointScheduling,
             Logger logger,
             ClassLoader userCodeClassLoader,
             CompletableFuture<String> savepointFuture) {
         super(context, executionGraph, executionGraphHandler, operatorCoordinatorHandler, logger);
         this.context = context;
         this.userCodeClassLoader = userCodeClassLoader;
-        this.stopWithSavepointOperations = stopWithSavepointOperations;
+        this.checkpointScheduling = checkpointScheduling;
         this.operationFuture = new CompletableFuture<>();
 
         FutureUtils.assertNoException(
@@ -95,7 +95,7 @@ class StopWithSavepoint extends StateWithExecutionGraph {
                         .warn(
                                 "Continuing execution because creating the savepoint failed with",
                                 throwable);
-                stopWithSavepointOperations.startCheckpointScheduler();
+                checkpointScheduling.startCheckpointScheduler();
                 context.goToExecuting(
                         getExecutionGraph(),
                         getExecutionGraphHandler(),
@@ -252,7 +252,16 @@ class StopWithSavepoint extends StateWithExecutionGraph {
                 ExecutionGraphHandler executionGraphHandler,
                 OperatorCoordinatorHandler operatorCoordinatorHandler);
 
-        void runIfState(State state, Runnable runnable, Duration delay);
+        /**
+         * Runs the given action after the specified delay if the state is the expected state at
+         * this time.
+         *
+         * @param expectedState expectedState describes the required state to run the action after
+         *     the delay
+         * @param action action to run if the state equals the expected state
+         * @param delay delay after which the action should be executed
+         */
+        void runIfState(State expectedState, Runnable action, Duration delay);
     }
 
     static class Factory implements StateFactory<StopWithSavepoint> {
@@ -264,7 +273,7 @@ class StopWithSavepoint extends StateWithExecutionGraph {
 
         private final OperatorCoordinatorHandler operatorCoordinatorHandler;
 
-        private final StopWithSavepointOperations stopWithSavepointOperations;
+        private final CheckpointScheduling checkpointScheduling;
 
         private final Logger logger;
 
@@ -277,7 +286,7 @@ class StopWithSavepoint extends StateWithExecutionGraph {
                 ExecutionGraph executionGraph,
                 ExecutionGraphHandler executionGraphHandler,
                 OperatorCoordinatorHandler operatorCoordinatorHandler,
-                StopWithSavepointOperations stopWithSavepointOperations,
+                CheckpointScheduling checkpointScheduling,
                 Logger logger,
                 ClassLoader userCodeClassLoader,
                 CompletableFuture<String> savepointFuture) {
@@ -285,7 +294,7 @@ class StopWithSavepoint extends StateWithExecutionGraph {
             this.executionGraph = executionGraph;
             this.executionGraphHandler = executionGraphHandler;
             this.operatorCoordinatorHandler = operatorCoordinatorHandler;
-            this.stopWithSavepointOperations = stopWithSavepointOperations;
+            this.checkpointScheduling = checkpointScheduling;
             this.logger = logger;
             this.userCodeClassLoader = userCodeClassLoader;
             this.savepointFuture = savepointFuture;
@@ -303,7 +312,7 @@ class StopWithSavepoint extends StateWithExecutionGraph {
                     executionGraph,
                     executionGraphHandler,
                     operatorCoordinatorHandler,
-                    stopWithSavepointOperations,
+                    checkpointScheduling,
                     logger,
                     userCodeClassLoader,
                     savepointFuture);

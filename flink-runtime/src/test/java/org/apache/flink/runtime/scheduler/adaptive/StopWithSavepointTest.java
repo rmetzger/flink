@@ -21,8 +21,8 @@ package org.apache.flink.runtime.scheduler.adaptive;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.runtime.checkpoint.CheckpointProperties;
+import org.apache.flink.runtime.checkpoint.CheckpointScheduling;
 import org.apache.flink.runtime.checkpoint.CompletedCheckpoint;
-import org.apache.flink.runtime.checkpoint.StopWithSavepointOperations;
 import org.apache.flink.runtime.executiongraph.ExecutionGraph;
 import org.apache.flink.runtime.scheduler.ExecutionGraphHandler;
 import org.apache.flink.runtime.scheduler.OperatorCoordinatorHandler;
@@ -31,8 +31,6 @@ import org.apache.flink.runtime.state.testutils.TestCompletedCheckpointStorageLo
 import org.apache.flink.util.TestLogger;
 
 import org.junit.Test;
-
-import javax.annotation.Nullable;
 
 import java.time.Duration;
 import java.util.HashMap;
@@ -160,8 +158,7 @@ public class StopWithSavepointTest extends TestLogger {
     public void testExceptionalSavepointCompletionLeadsToExceptionalOperationFutureCompletion()
             throws Exception {
         MockStopWithSavepointContext ctx = new MockStopWithSavepointContext();
-        MockStopWithSavepointOperations mockStopWithSavepointOperations =
-                new MockStopWithSavepointOperations();
+        MockCheckpointScheduling mockStopWithSavepointOperations = new MockCheckpointScheduling();
         StopWithSavepoint sws = createStopWithSavepoint(ctx, mockStopWithSavepointOperations);
 
         mockStopWithSavepointOperations
@@ -175,8 +172,8 @@ public class StopWithSavepointTest extends TestLogger {
     @Test
     public void testRestartOnTaskFailureAfterSavepointCompletion() throws Exception {
         try (MockStopWithSavepointContext ctx = new MockStopWithSavepointContext()) {
-            MockStopWithSavepointOperations mockStopWithSavepointOperations =
-                    new MockStopWithSavepointOperations();
+            MockCheckpointScheduling mockStopWithSavepointOperations =
+                    new MockCheckpointScheduling();
             StopWithSavepoint sws = createStopWithSavepoint(ctx, mockStopWithSavepointOperations);
             ctx.setStopWithSavepoint(sws);
 
@@ -199,8 +196,8 @@ public class StopWithSavepointTest extends TestLogger {
     @Test
     public void testEnsureCheckpointSchedulerLifecycle() throws Exception {
         try (MockStopWithSavepointContext ctx = new MockStopWithSavepointContext()) {
-            MockStopWithSavepointOperations mockStopWithSavepointOperations =
-                    new MockStopWithSavepointOperations();
+            MockCheckpointScheduling mockStopWithSavepointOperations =
+                    new MockCheckpointScheduling();
 
             assertThat(mockStopWithSavepointOperations.isCheckpointSchedulerStarted(), is(true));
 
@@ -221,24 +218,23 @@ public class StopWithSavepointTest extends TestLogger {
 
     private StopWithSavepoint createStopWithSavepoint(MockStopWithSavepointContext ctx) {
         return createStopWithSavepoint(
-                ctx, new MockStopWithSavepointOperations(), new StateTrackingMockExecutionGraph());
+                ctx, new MockCheckpointScheduling(), new StateTrackingMockExecutionGraph());
     }
 
     private StopWithSavepoint createStopWithSavepoint(
             MockStopWithSavepointContext ctx, ExecutionGraph executionGraph) {
-        return createStopWithSavepoint(ctx, new MockStopWithSavepointOperations(), executionGraph);
+        return createStopWithSavepoint(ctx, new MockCheckpointScheduling(), executionGraph);
     }
 
     private StopWithSavepoint createStopWithSavepoint(
-            MockStopWithSavepointContext ctx,
-            StopWithSavepointOperations stopWithSavepointOperations) {
+            MockStopWithSavepointContext ctx, CheckpointScheduling checkpointScheduling) {
         return createStopWithSavepoint(
-                ctx, stopWithSavepointOperations, new StateTrackingMockExecutionGraph());
+                ctx, checkpointScheduling, new StateTrackingMockExecutionGraph());
     }
 
     private StopWithSavepoint createStopWithSavepoint(
             MockStopWithSavepointContext ctx,
-            StopWithSavepointOperations stopWithSavepointOperations,
+            CheckpointScheduling checkpointScheduling,
             ExecutionGraph executionGraph) {
         final ExecutionGraphHandler executionGraphHandler =
                 new ExecutionGraphHandler(
@@ -389,7 +385,7 @@ public class StopWithSavepointTest extends TestLogger {
                         new TestingStreamStateHandle(), "savepoint-path"));
     }
 
-    private static class MockStopWithSavepointOperations implements StopWithSavepointOperations {
+    private static class MockCheckpointScheduling implements CheckpointScheduling {
         private boolean checkpointSchedulerStarted = true;
         private CompletableFuture<CompletedCheckpoint> savepointFuture = new CompletableFuture<>();
 
@@ -401,12 +397,6 @@ public class StopWithSavepointTest extends TestLogger {
         @Override
         public void stopCheckpointScheduler() {
             checkpointSchedulerStarted = false;
-        }
-
-        @Override
-        public CompletableFuture<CompletedCheckpoint> triggerSynchronousSavepoint(
-                boolean terminate, @Nullable String targetLocation) {
-            return savepointFuture;
         }
 
         boolean isCheckpointSchedulerStarted() {

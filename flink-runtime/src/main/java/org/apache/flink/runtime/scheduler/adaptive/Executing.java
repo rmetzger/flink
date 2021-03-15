@@ -20,8 +20,8 @@ package org.apache.flink.runtime.scheduler.adaptive;
 
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.runtime.JobException;
+import org.apache.flink.runtime.checkpoint.CheckpointScheduling;
 import org.apache.flink.runtime.checkpoint.CompletedCheckpoint;
-import org.apache.flink.runtime.checkpoint.StopWithSavepointOperations;
 import org.apache.flink.runtime.execution.ExecutionState;
 import org.apache.flink.runtime.executiongraph.ArchivedExecutionGraph;
 import org.apache.flink.runtime.executiongraph.ExecutionGraph;
@@ -30,7 +30,7 @@ import org.apache.flink.runtime.executiongraph.ExecutionVertex;
 import org.apache.flink.runtime.executiongraph.TaskExecutionStateTransition;
 import org.apache.flink.runtime.scheduler.ExecutionGraphHandler;
 import org.apache.flink.runtime.scheduler.OperatorCoordinatorHandler;
-import org.apache.flink.runtime.scheduler.stopwithsavepoint.StopWithSavepointOperationManager;
+import org.apache.flink.runtime.scheduler.stopwithsavepoint.StopWithSavepointTerminationManager;
 import org.apache.flink.util.Preconditions;
 
 import org.slf4j.Logger;
@@ -151,7 +151,7 @@ class Executing extends StateWithExecutionGraph implements ResourceConsumer {
             @Nullable final String targetDirectory, boolean terminate) {
         final ExecutionGraph executionGraph = getExecutionGraph();
 
-        StopWithSavepointOperationManager.checkStopWithSavepointPreconditions(
+        StopWithSavepointTerminationManager.checkStopWithSavepointPreconditions(
                 executionGraph.getCheckpointCoordinator(),
                 targetDirectory,
                 executionGraph.getJobID(),
@@ -159,17 +159,18 @@ class Executing extends StateWithExecutionGraph implements ResourceConsumer {
 
         getLogger().info("Triggering stop-with-savepoint for job {}.", executionGraph.getJobID());
 
-        final StopWithSavepointOperations stopWithSavepointOperations =
-                new StopWithSavepointOperationsProvider(executionGraph);
+        final CheckpointScheduling checkpointScheduling =
+                new CheckpointSchedulingProvider(executionGraph);
         final CompletableFuture<String> savepointFuture =
-                stopWithSavepointOperations
+                executionGraph
+                        .getCheckpointCoordinator()
                         .triggerSynchronousSavepoint(terminate, targetDirectory)
                         .thenApply(CompletedCheckpoint::getExternalPointer);
         return context.goToStopWithSavepoint(
                 executionGraph,
                 getExecutionGraphHandler(),
                 getOperatorCoordinatorHandler(),
-                stopWithSavepointOperations,
+                checkpointScheduling,
                 savepointFuture);
     }
 
@@ -252,7 +253,7 @@ class Executing extends StateWithExecutionGraph implements ResourceConsumer {
                 ExecutionGraph executionGraph,
                 ExecutionGraphHandler executionGraphHandler,
                 OperatorCoordinatorHandler operatorCoordinatorHandler,
-                StopWithSavepointOperations stopWithSavepointOperations,
+                CheckpointScheduling checkpointScheduling,
                 CompletableFuture<String> savepointFuture);
     }
 

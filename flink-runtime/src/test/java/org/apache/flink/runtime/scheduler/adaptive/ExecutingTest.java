@@ -26,7 +26,7 @@ import org.apache.flink.runtime.blob.BlobWriter;
 import org.apache.flink.runtime.blob.PermanentBlobKey;
 import org.apache.flink.runtime.checkpoint.CheckpointCoordinator;
 import org.apache.flink.runtime.checkpoint.CheckpointCoordinatorTestingUtils;
-import org.apache.flink.runtime.checkpoint.StopWithSavepointOperations;
+import org.apache.flink.runtime.checkpoint.CheckpointScheduling;
 import org.apache.flink.runtime.client.JobExecutionException;
 import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutor;
 import org.apache.flink.runtime.deployment.TaskDeploymentDescriptorFactory;
@@ -459,14 +459,14 @@ public class ExecutingTest extends TestLogger {
                 ExecutionGraph executionGraph,
                 ExecutionGraphHandler executionGraphHandler,
                 OperatorCoordinatorHandler operatorCoordinatorHandler,
-                StopWithSavepointOperations stopWithSavepointOperations,
+                CheckpointScheduling checkpointScheduling,
                 CompletableFuture<String> savepointFuture) {
             stopWithSavepointValidator.validateInput(
                     new StopWithSavepointArguments(
                             executionGraph,
                             executionGraphHandler,
                             operatorCoordinatorHandler,
-                            stopWithSavepointOperations,
+                            checkpointScheduling,
                             savepointFuture));
             hadStateTransition = true;
             return mockedStopWithSavepointOperationFuture;
@@ -510,17 +510,17 @@ public class ExecutingTest extends TestLogger {
     }
 
     static class StopWithSavepointArguments extends CancellingArguments {
-        private final StopWithSavepointOperations stopWithSavepointOperations;
+        private final CheckpointScheduling checkpointScheduling;
         private final CompletableFuture<String> savepointFuture;
 
         public StopWithSavepointArguments(
                 ExecutionGraph executionGraph,
                 ExecutionGraphHandler executionGraphHandler,
                 OperatorCoordinatorHandler operatorCoordinatorHandle,
-                StopWithSavepointOperations stopWithSavepointOperations,
+                CheckpointScheduling checkpointScheduling,
                 CompletableFuture<String> savepointFuture) {
             super(executionGraph, executionGraphHandler, operatorCoordinatorHandle);
-            this.stopWithSavepointOperations = stopWithSavepointOperations;
+            this.checkpointScheduling = checkpointScheduling;
             this.savepointFuture = savepointFuture;
         }
     }

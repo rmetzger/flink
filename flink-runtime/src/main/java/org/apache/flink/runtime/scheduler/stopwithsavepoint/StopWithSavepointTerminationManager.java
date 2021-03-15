@@ -22,7 +22,7 @@ import org.apache.flink.api.common.JobID;
 import org.apache.flink.configuration.CheckpointingOptions;
 import org.apache.flink.runtime.checkpoint.CheckpointCoordinator;
 import org.apache.flink.runtime.checkpoint.CompletedCheckpoint;
-import org.apache.flink.runtime.checkpoint.StopWithSavepointOperations;
+import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutor;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.execution.ExecutionState;
 import org.apache.flink.util.Preconditions;
@@ -33,56 +33,42 @@ import javax.annotation.Nullable;
 
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 
 /**
- * {@code StopWithSavepointOperationManager} fulfills the contract given by {@link
- * StopWithSavepointOperationHandler} to run the stop-with-savepoint steps in a specific order.
+ * {@code StopWithSavepointTerminationManager} fulfills the contract given by {@link
+ * StopWithSavepointTerminationHandler} to run the stop-with-savepoint steps in a specific order.
  */
-public class StopWithSavepointOperationManager {
+public class StopWithSavepointTerminationManager {
 
-    private final StopWithSavepointOperationHandler stopWithSavepointOperationHandler;
-    private final StopWithSavepointOperations stopWithSavepointOperations;
+    private final StopWithSavepointTerminationHandler stopWithSavepointTerminationHandler;
 
-    public StopWithSavepointOperationManager(
-            StopWithSavepointOperations stopWithSavepointOperations,
-            StopWithSavepointOperationHandler stopWithSavepointOperationHandler) {
-        this.stopWithSavepointOperations = stopWithSavepointOperations;
-        this.stopWithSavepointOperationHandler =
-                Preconditions.checkNotNull(stopWithSavepointOperationHandler);
+    public StopWithSavepointTerminationManager(
+            StopWithSavepointTerminationHandler stopWithSavepointTerminationHandler) {
+        this.stopWithSavepointTerminationHandler =
+                Preconditions.checkNotNull(stopWithSavepointTerminationHandler);
     }
 
     /**
      * Enforces the correct completion order of the passed {@code CompletableFuture} instances in
-     * accordance to the contract of {@link StopWithSavepointOperationHandler}.
+     * accordance to the contract of {@link StopWithSavepointTerminationHandler}.
      *
-     * @param terminate Flag indicating whether to terminate or suspend the job.
-     * @param targetDirectory Target for the savepoint.
+     * @param completedSavepointFuture The {@code CompletableFuture} of the savepoint creation step.
      * @param terminatedExecutionStatesFuture The {@code CompletableFuture} of the termination step.
-     * @param mainThreadExecutor The executor the {@code StopWithSavepointOperationHandler}
+     * @param mainThreadExecutor The executor the {@code StopWithSavepointTerminationHandler}
      *     operations run on.
      * @return A {@code CompletableFuture} containing the path to the created savepoint.
      */
-    public CompletableFuture<String> trackStopWithSavepointWithTerminationFutures(
-            boolean terminate,
-            @Nullable String targetDirectory,
+    public CompletableFuture<String> stopWithSavepoint(
+            CompletableFuture<CompletedCheckpoint> completedSavepointFuture,
             CompletableFuture<Collection<ExecutionState>> terminatedExecutionStatesFuture,
-            Executor mainThreadExecutor) {
-
-        // do not trigger checkpoints while creating the final savepoint
-        stopWithSavepointOperations.stopCheckpointScheduler();
-
-        // trigger savepoint. This operation will also terminate/suspend the job once the savepoint
-        // has been created.
-        final CompletableFuture<CompletedCheckpoint> savepointFuture =
-                stopWithSavepointOperations.triggerSynchronousSavepoint(terminate, targetDirectory);
+            ComponentMainThreadExecutor mainThreadExecutor) {
         FutureUtils.assertNoException(
-                savepointFuture
+                completedSavepointFuture
                         // the completedSavepointFuture could also be completed by
                         // CheckpointCanceller which doesn't run in the mainThreadExecutor
                         .handleAsync(
                                 (completedSavepoint, throwable) -> {
-                                    stopWithSavepointOperationHandler.handleSavepointCreation(
+                                    stopWithSavepointTerminationHandler.handleSavepointCreation(
                                             completedSavepoint, throwable);
                                     return null;
                                 },
@@ -94,11 +80,11 @@ public class StopWithSavepointOperationManager {
                                                 // separate Runnable to disconnect it from any
                                                 // previous task failure handling
                                                 terminatedExecutionStatesFuture.thenAcceptAsync(
-                                                        stopWithSavepointOperationHandler
+                                                        stopWithSavepointTerminationHandler
                                                                 ::handleExecutionsTermination,
                                                         mainThreadExecutor))));
 
-        return stopWithSavepointOperationHandler.getSavepointPathFuture();
+        return stopWithSavepointTerminationHandler.getSavepointPath();
     }
 
     public static void checkStopWithSavepointPreconditions(

@@ -18,30 +18,15 @@
 
 package org.apache.flink.runtime.checkpoint;
 
-import javax.annotation.Nullable;
-
-import java.util.concurrent.CompletableFuture;
-
 /**
- * {@code StopWithSavepointOperations} provides all checkpoint coordinator related methods for doing
- * a stop with savepoint operation.
+ * {@code CheckpointScheduling} provides methods for starting and stopping the periodic scheduling
+ * of checkpoints.
  */
-public interface StopWithSavepointOperations {
+public interface CheckpointScheduling {
 
     /** Starts the periodic scheduling if possible. */
     void startCheckpointScheduler();
 
     /** Stops the periodic scheduling if possible. */
     void stopCheckpointScheduler();
-
-    /**
-     * Triggers a synchronous savepoint with the given savepoint directory as a target.
-     *
-     * @param terminate flag indicating if the job should terminate or just suspend
-     * @param targetLocation Target location for the savepoint, optional. If null, the state
-     *     backend's configured default will be used.
-     * @return A future to the completed checkpoint
-     */
-    CompletableFuture<CompletedCheckpoint> triggerSynchronousSavepoint(
-            final boolean terminate, @Nullable final String targetLocation);
 }

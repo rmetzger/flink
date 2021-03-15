@@ -19,7 +19,6 @@
 package org.apache.flink.runtime.scheduler.stopwithsavepoint;
 
 import org.apache.flink.runtime.checkpoint.CompletedCheckpoint;
-import org.apache.flink.runtime.checkpoint.StopWithSavepointOperations;
 import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutorServiceAdapter;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.execution.ExecutionState;
@@ -27,8 +26,6 @@ import org.apache.flink.util.TestLogger;
 
 import org.hamcrest.CoreMatchers;
 import org.junit.Test;
-
-import javax.annotation.Nullable;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -41,12 +38,12 @@ import java.util.function.BiConsumer;
 import static org.junit.Assert.assertThat;
 
 /**
- * {@code StopWithSavepointOperationManagerTest} tests that {@link
- * StopWithSavepointOperationManager} applies the correct order expected by {@link
- * StopWithSavepointOperationHandler} regardless of the completion of the provided {@code
+ * {@code StopWithSavepointTerminationManagerTest} tests that {@link
+ * StopWithSavepointTerminationManager} applies the correct order expected by {@link
+ * StopWithSavepointTerminationHandler} regardless of the completion of the provided {@code
  * CompletableFutures}.
  */
-public class StopWithSavepointOperationManagerTest extends TestLogger {
+public class StopWithSavepointTerminationManagerTest extends TestLogger {
 
     @Test
     public void testCompletionInCorrectOrder() {
@@ -74,15 +71,11 @@ public class StopWithSavepointOperationManagerTest extends TestLogger {
         final CompletableFuture<ExecutionState> terminatedExecutionStateFuture =
                 new CompletableFuture<>();
 
-        final TestingStopWithSavepointOperations testingStopWithSavepointOperations =
-                new TestingStopWithSavepointOperations(completedSavepointFuture);
-        final TestingStopWithSavepointOperationHandler stopWithSavepointTerminationHandler =
-                new TestingStopWithSavepointOperationHandler();
-        new StopWithSavepointOperationManager(
-                        testingStopWithSavepointOperations, stopWithSavepointTerminationHandler)
-                .trackStopWithSavepointWithTerminationFutures(
-                        false,
-                        "",
+        final TestingStopWithSavepointTerminationHandler stopWithSavepointTerminationHandler =
+                new TestingStopWithSavepointTerminationHandler();
+        new StopWithSavepointTerminationManager(stopWithSavepointTerminationHandler)
+                .stopWithSavepoint(
+                        completedSavepointFuture,
                         terminatedExecutionStateFuture.thenApply(Collections::singleton),
                         ComponentMainThreadExecutorServiceAdapter.forMainThread());
         completion.accept(completedSavepointFuture, terminatedExecutionStateFuture);
@@ -97,17 +90,16 @@ public class StopWithSavepointOperationManagerTest extends TestLogger {
 
     private enum MethodCall {
         SavepointCreationTermination,
-        AbortOperation,
         ExecutionTermination
     }
 
-    private static class TestingStopWithSavepointOperationHandler
-            implements StopWithSavepointOperationHandler {
+    private static class TestingStopWithSavepointTerminationHandler
+            implements StopWithSavepointTerminationHandler {
 
         private final List<MethodCall> methodCalls = new ArrayList<>(2);
 
         @Override
-        public CompletableFuture<String> getSavepointPathFuture() {
+        public CompletableFuture<String> getSavepointPath() {
             return FutureUtils.completedExceptionally(
                     new Exception("The result is not relevant in this test."));
         }
@@ -124,35 +116,8 @@ public class StopWithSavepointOperationManagerTest extends TestLogger {
             methodCalls.add(MethodCall.ExecutionTermination);
         }
 
-        @Override
-        public void abortOperation(Throwable cause) {
-            methodCalls.add(MethodCall.AbortOperation);
-        }
-
         public List<MethodCall> getActualMethodCallOrder() {
             return methodCalls;
-        }
-    }
-
-    private static class TestingStopWithSavepointOperations implements StopWithSavepointOperations {
-
-        private final CompletableFuture<CompletedCheckpoint> savepointFuture;
-
-        private TestingStopWithSavepointOperations(
-                CompletableFuture<CompletedCheckpoint> savepointFuture) {
-            this.savepointFuture = savepointFuture;
-        }
-
-        @Override
-        public void startCheckpointScheduler() {}
-
-        @Override
-        public void stopCheckpointScheduler() {}
-
-        @Override
-        public CompletableFuture<CompletedCheckpoint> triggerSynchronousSavepoint(
-                boolean terminate, @Nullable String targetLocation) {
-            return savepointFuture;
         }
     }
 }

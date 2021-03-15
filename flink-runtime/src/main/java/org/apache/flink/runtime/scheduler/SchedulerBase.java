@@ -35,10 +35,10 @@ import org.apache.flink.runtime.checkpoint.CheckpointFailureReason;
 import org.apache.flink.runtime.checkpoint.CheckpointIDCounter;
 import org.apache.flink.runtime.checkpoint.CheckpointMetrics;
 import org.apache.flink.runtime.checkpoint.CheckpointRecoveryFactory;
+import org.apache.flink.runtime.checkpoint.CheckpointScheduling;
 import org.apache.flink.runtime.checkpoint.CheckpointsCleaner;
 import org.apache.flink.runtime.checkpoint.CompletedCheckpoint;
 import org.apache.flink.runtime.checkpoint.CompletedCheckpointStore;
-import org.apache.flink.runtime.checkpoint.StopWithSavepointOperations;
 import org.apache.flink.runtime.checkpoint.TaskStateSnapshot;
 import org.apache.flink.runtime.client.JobExecutionException;
 import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutor;
@@ -83,8 +83,8 @@ import org.apache.flink.runtime.operators.coordination.OperatorCoordinatorHolder
 import org.apache.flink.runtime.operators.coordination.OperatorEvent;
 import org.apache.flink.runtime.query.KvStateLocation;
 import org.apache.flink.runtime.query.UnknownKvStateLocation;
-import org.apache.flink.runtime.scheduler.stopwithsavepoint.StopWithSavepointOperationHandlerImpl;
-import org.apache.flink.runtime.scheduler.stopwithsavepoint.StopWithSavepointOperationManager;
+import org.apache.flink.runtime.scheduler.stopwithsavepoint.StopWithSavepointTerminationHandlerImpl;
+import org.apache.flink.runtime.scheduler.stopwithsavepoint.StopWithSavepointTerminationManager;
 import org.apache.flink.runtime.scheduler.strategy.ExecutionVertexID;
 import org.apache.flink.runtime.scheduler.strategy.SchedulingExecutionVertex;
 import org.apache.flink.runtime.scheduler.strategy.SchedulingTopology;
@@ -116,12 +116,13 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.apache.flink.util.Preconditions.checkState;
 
 /** Base class which can be used to implement {@link SchedulerNG}. */
-public abstract class SchedulerBase implements SchedulerNG, StopWithSavepointOperations {
+public abstract class SchedulerBase implements SchedulerNG, CheckpointScheduling {
 
     private final Logger log;
 
@@ -949,29 +950,45 @@ public abstract class SchedulerBase implements SchedulerNG, StopWithSavepointOpe
         final CheckpointCoordinator checkpointCoordinator =
                 executionGraph.getCheckpointCoordinator();
 
-        StopWithSavepointOperationManager.checkStopWithSavepointPreconditions(
+        StopWithSavepointTerminationManager.checkStopWithSavepointPreconditions(
                 checkpointCoordinator, targetDirectory, executionGraph.getJobID(), log);
 
         log.info("Triggering stop-with-savepoint for job {}.", jobGraph.getJobID());
 
+        // we stop the checkpoint coordinator so that we are guaranteed
+        // to have only the data of the synchronous savepoint committed.
+        // in case of failure, and if the job restarts, the coordinator
+        // will be restarted by the CheckpointCoordinatorDeActivator.
+        stopCheckpointScheduler();
+
         final CompletableFuture<Collection<ExecutionState>> executionTerminationsFuture =
-                SchedulerUtils.getCombinedExecutionTerminationFuture(executionGraph);
+                getCombinedExecutionTerminationFuture();
 
-        final StopWithSavepointOperationManager stopWithSavepointOperationManager =
-                new StopWithSavepointOperationManager(
-                        this,
-                        new StopWithSavepointOperationHandlerImpl(jobGraph.getJobID(), this, log));
+        final CompletableFuture<CompletedCheckpoint> savepointFuture =
+                checkpointCoordinator.triggerSynchronousSavepoint(terminate, targetDirectory);
 
-        return stopWithSavepointOperationManager.trackStopWithSavepointWithTerminationFutures(
-                terminate, targetDirectory, executionTerminationsFuture, mainThreadExecutor);
+        final StopWithSavepointTerminationManager stopWithSavepointTerminationManager =
+                new StopWithSavepointTerminationManager(
+                        new StopWithSavepointTerminationHandlerImpl(
+                                jobGraph.getJobID(), this, log));
+
+        return stopWithSavepointTerminationManager.stopWithSavepoint(
+                savepointFuture, executionTerminationsFuture, mainThreadExecutor);
     }
 
-    @Override
-    public CompletableFuture<CompletedCheckpoint> triggerSynchronousSavepoint(
-            boolean terminate, @Nullable String targetLocation) {
-        return executionGraph
-                .getCheckpointCoordinator()
-                .triggerSynchronousSavepoint(terminate, targetLocation);
+    /**
+     * Returns a {@code CompletableFuture} collecting the termination states of all {@link Execution
+     * Executions} of the underlying {@link ExecutionGraph}.
+     *
+     * @return a {@code CompletableFuture} that completes after all underlying {@code Executions}
+     *     have been terminated.
+     */
+    private CompletableFuture<Collection<ExecutionState>> getCombinedExecutionTerminationFuture() {
+        return FutureUtils.combineAll(
+                StreamSupport.stream(executionGraph.getAllExecutionVertices().spliterator(), false)
+                        .map(ExecutionVertex::getCurrentExecutionAttempt)
+                        .map(Execution::getTerminalStateFuture)
+                        .collect(Collectors.toList()));
     }
 
     // ------------------------------------------------------------------------

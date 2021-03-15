@@ -18,21 +18,17 @@
 
 package org.apache.flink.runtime.checkpoint;
 
-import javax.annotation.Nullable;
-
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * {@code TestingCheckpointScheduling} is a basic testing implementation of {@link
- * StopWithSavepointOperations} that provides a flag indicating whether checkpoint scheduling is
- * enabled.
+ * CheckpointScheduling} that provides a flag indicating whether checkpoint scheduling is enabled.
  */
-public class TestingStopWithSavepointOperations implements StopWithSavepointOperations {
+public class TestingCheckpointScheduling implements CheckpointScheduling {
 
     private final AtomicBoolean checkpointSchedulingEnabled;
 
-    public TestingStopWithSavepointOperations(boolean initialState) {
+    public TestingCheckpointScheduling(boolean initialState) {
         checkpointSchedulingEnabled = new AtomicBoolean(initialState);
     }
 
@@ -44,12 +40,6 @@ public class TestingStopWithSavepointOperations implements StopWithSavepointOper
     @Override
     public void stopCheckpointScheduler() {
         checkpointSchedulingEnabled.set(false);
-    }
-
-    @Override
-    public CompletableFuture<CompletedCheckpoint> triggerSynchronousSavepoint(
-            boolean terminate, @Nullable String targetLocation) {
-        throw new UnsupportedOperationException();
     }
 
     public boolean isEnabled() {
