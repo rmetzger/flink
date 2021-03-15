@@ -153,7 +153,7 @@ public class StopWithSavepointTest extends TestLogger {
         sws.onLeave(Canceling.class);
 
         ctx.close();
-        assertThat(sws.getOperationCompletionFuture().isCompletedExceptionally(), is(true));
+        assertThat(sws.getOperationFuture().isCompletedExceptionally(), is(true));
     }
 
     @Test
@@ -169,7 +169,7 @@ public class StopWithSavepointTest extends TestLogger {
                 .completeExceptionally(new RuntimeException("Test error"));
 
         ctx.close();
-        assertThat(sws.getOperationCompletionFuture().isCompletedExceptionally(), is(true));
+        assertThat(sws.getOperationFuture().isCompletedExceptionally(), is(true));
     }
 
     @Test
@@ -255,16 +255,16 @@ public class StopWithSavepointTest extends TestLogger {
 
         executionGraph.transitionToRunning();
 
-        return new StopWithSavepoint(
-                ctx,
-                executionGraph,
-                executionGraphHandler,
-                operatorCoordinatorHandler,
-                stopWithSavepointOperations,
-                log,
-                ClassLoader.getSystemClassLoader(),
-                "",
-                true);
+        return null; /* new StopWithSavepoint(
+                     ctx,
+                     executionGraph,
+                     executionGraphHandler,
+                     operatorCoordinatorHandler,
+                     stopWithSavepointOperations,
+                     log,
+                     ClassLoader.getSystemClassLoader(),
+                     "",
+                     true); */
     }
 
     private static class MockStopWithSavepointContext extends MockStateWithExecutionGraphContext
@@ -357,6 +357,15 @@ public class StopWithSavepointTest extends TestLogger {
                             failureCause));
             hadStateTransition = true;
         }
+
+        @Override
+        public void goToExecuting(
+                ExecutionGraph executionGraph,
+                ExecutionGraphHandler executionGraphHandler,
+                OperatorCoordinatorHandler operatorCoordinatorHandler) {}
+
+        @Override
+        public void runIfState(State state, Runnable runnable, Duration delay) {}
 
         @Override
         public void close() throws Exception {

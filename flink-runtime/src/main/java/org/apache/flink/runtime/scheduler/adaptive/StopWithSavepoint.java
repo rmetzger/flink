@@ -27,8 +27,6 @@ import org.apache.flink.runtime.executiongraph.ExecutionGraph;
 import org.apache.flink.runtime.executiongraph.TaskExecutionStateTransition;
 import org.apache.flink.runtime.scheduler.ExecutionGraphHandler;
 import org.apache.flink.runtime.scheduler.OperatorCoordinatorHandler;
-import org.apache.flink.runtime.scheduler.stopwithsavepoint.StopWithSavepointOperationHandler;
-import org.apache.flink.runtime.scheduler.stopwithsavepoint.StopWithSavepointOperationManager;
 import org.apache.flink.util.FlinkException;
 
 import org.slf4j.Logger;
@@ -40,18 +38,13 @@ import java.util.concurrent.CompletableFuture;
 
 /**
  * When a "stop with savepoint" operation (wait until savepoint has been created, then cancel job)
- * is triggered on the {@link Executing} state, we transition into this state. This state is
- * delegating the tracking of the stop with savepoint operation to the {@link
- * StopWithSavepointOperationManagerForAdaptiveScheduler} which tracks the operation through the
- * {@link StopWithSavepointOperationHandler}. This allows us to share the operation tracking logic
- * across all scheduler implementations.
+ * is triggered on the {@link Executing} state, we transition into this state.
  */
 class StopWithSavepoint extends StateWithExecutionGraph {
 
     private final Context context;
     private final ClassLoader userCodeClassLoader;
 
-    private final CompletableFuture<String> savepointFuture;
     private final CompletableFuture<String> operationFuture;
 
     private final StopWithSavepointOperations stopWithSavepointOperations;
@@ -73,15 +66,14 @@ class StopWithSavepoint extends StateWithExecutionGraph {
         this.context = context;
         this.userCodeClassLoader = userCodeClassLoader;
         this.stopWithSavepointOperations = stopWithSavepointOperations;
-        this.savepointFuture = savepointFuture;
         this.operationFuture = new CompletableFuture<>();
 
         FutureUtils.assertNoException(
                 savepointFuture.handle(
-                        (savepoint, throwable) -> {
+                        (savepointLocation, throwable) -> {
                             context.runIfState(
                                     this,
-                                    () -> handleSavepointCompletion(savepoint, throwable),
+                                    () -> handleSavepointCompletion(savepointLocation, throwable),
                                     Duration.ZERO);
                             return null;
                         }));
@@ -89,8 +81,7 @@ class StopWithSavepoint extends StateWithExecutionGraph {
 
     private void handleSavepointCompletion(
             @Nullable String savepoint, @Nullable Throwable throwable) {
-        // this is a bit ugly because we have to order the savepoint and globally terminal state
-        // signals
+
         if (hasFullyFinished) {
             if (throwable != null) {
                 throw new IllegalStateException(
@@ -100,6 +91,10 @@ class StopWithSavepoint extends StateWithExecutionGraph {
             }
         } else {
             if (throwable != null) {
+                getLogger()
+                        .warn(
+                                "Continuing execution because creating the savepoint failed with",
+                                throwable);
                 stopWithSavepointOperations.startCheckpointScheduler();
                 context.goToExecuting(
                         getExecutionGraph(),
@@ -135,10 +130,6 @@ class StopWithSavepoint extends StateWithExecutionGraph {
         handleAnyFailure(cause);
     }
 
-    /**
-     * The {@code executionTerminationsFuture} will complete if a task reached a terminal state, and
-     * {@link StopWithSavepointOperationManager} will act accordingly.
-     */
     @Override
     boolean updateTaskExecutionState(TaskExecutionStateTransition taskExecutionStateTransition) {
         final boolean successfulUpdate =
@@ -156,8 +147,6 @@ class StopWithSavepoint extends StateWithExecutionGraph {
 
     @Override
     void onGloballyTerminalState(JobStatus globallyTerminalState) {
-        // this is a bit ugly because we have to order the savepoint and globally terminal state
-        // signals
         if (globallyTerminalState == JobStatus.FINISHED) {
             if (savepoint == null) {
                 hasFullyFinished = true;
@@ -192,7 +181,7 @@ class StopWithSavepoint extends StateWithExecutionGraph {
         }
     }
 
-    CompletableFuture<String> getOperationCompletionFuture() {
+    CompletableFuture<String> getOperationFuture() {
         return operationFuture;
     }
 
@@ -250,6 +239,14 @@ class StopWithSavepoint extends StateWithExecutionGraph {
                 OperatorCoordinatorHandler operatorCoordinatorHandler,
                 Throwable failureCause);
 
+        /**
+         * Transitions into the {@link Executing} state.
+         *
+         * @param executionGraph executionGraph to pass to the {@link Executing} state
+         * @param executionGraphHandler executionGraphHandler to pass to the {@link Executing} state
+         * @param operatorCoordinatorHandler operatorCoordinatorHandler to pass to the {@link
+         *     Executing} state
+         */
         void goToExecuting(
                 ExecutionGraph executionGraph,
                 ExecutionGraphHandler executionGraphHandler,

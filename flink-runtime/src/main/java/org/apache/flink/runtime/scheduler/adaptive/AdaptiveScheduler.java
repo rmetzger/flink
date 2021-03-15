@@ -38,6 +38,7 @@ import org.apache.flink.runtime.checkpoint.CheckpointMetrics;
 import org.apache.flink.runtime.checkpoint.CheckpointRecoveryFactory;
 import org.apache.flink.runtime.checkpoint.CheckpointsCleaner;
 import org.apache.flink.runtime.checkpoint.CompletedCheckpointStore;
+import org.apache.flink.runtime.checkpoint.StopWithSavepointOperations;
 import org.apache.flink.runtime.checkpoint.TaskStateSnapshot;
 import org.apache.flink.runtime.client.JobExecutionException;
 import org.apache.flink.runtime.clusterframework.types.ResourceProfile;
@@ -750,6 +751,21 @@ public class AdaptiveScheduler
     }
 
     @Override
+    public void goToExecuting(
+            ExecutionGraph executionGraph,
+            ExecutionGraphHandler executionGraphHandler,
+            OperatorCoordinatorHandler operatorCoordinatorHandler) {
+        transitionToState(
+                new Executing.Factory(
+                        executionGraph,
+                        executionGraphHandler,
+                        operatorCoordinatorHandler,
+                        LOG,
+                        this,
+                        userCodeClassLoader));
+    }
+
+    @Override
     public void goToCanceling(
             ExecutionGraph executionGraph,
             ExecutionGraphHandler executionGraphHandler,
@@ -802,8 +818,8 @@ public class AdaptiveScheduler
             ExecutionGraph executionGraph,
             ExecutionGraphHandler executionGraphHandler,
             OperatorCoordinatorHandler operatorCoordinatorHandler,
-            @Nullable String targetDirectory,
-            boolean terminate) {
+            StopWithSavepointOperations stopWithSavepointOperations,
+            CompletableFuture<String> savepointFuture) {
 
         StopWithSavepoint stopWithSavepoint =
                 transitionToState(
@@ -812,12 +828,11 @@ public class AdaptiveScheduler
                                 executionGraph,
                                 executionGraphHandler,
                                 operatorCoordinatorHandler,
-                                new StopWithSavepointOperationsProvider(executionGraph),
+                                stopWithSavepointOperations,
                                 LOG,
                                 userCodeClassLoader,
-                                targetDirectory,
-                                terminate));
-        return stopWithSavepoint.getOperationCompletionFuture();
+                                savepointFuture));
+        return stopWithSavepoint.getOperationFuture();
     }
 
     @Override

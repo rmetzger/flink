@@ -26,6 +26,7 @@ import org.apache.flink.runtime.blob.BlobWriter;
 import org.apache.flink.runtime.blob.PermanentBlobKey;
 import org.apache.flink.runtime.checkpoint.CheckpointCoordinator;
 import org.apache.flink.runtime.checkpoint.CheckpointCoordinatorTestingUtils;
+import org.apache.flink.runtime.checkpoint.StopWithSavepointOperations;
 import org.apache.flink.runtime.client.JobExecutionException;
 import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutor;
 import org.apache.flink.runtime.deployment.TaskDeploymentDescriptorFactory;
@@ -458,15 +459,15 @@ public class ExecutingTest extends TestLogger {
                 ExecutionGraph executionGraph,
                 ExecutionGraphHandler executionGraphHandler,
                 OperatorCoordinatorHandler operatorCoordinatorHandler,
-                String targetDirectory,
-                boolean terminate) {
+                StopWithSavepointOperations stopWithSavepointOperations,
+                CompletableFuture<String> savepointFuture) {
             stopWithSavepointValidator.validateInput(
                     new StopWithSavepointArguments(
                             executionGraph,
                             executionGraphHandler,
                             operatorCoordinatorHandler,
-                            targetDirectory,
-                            terminate));
+                            stopWithSavepointOperations,
+                            savepointFuture));
             hadStateTransition = true;
             return mockedStopWithSavepointOperationFuture;
         }
@@ -509,18 +510,18 @@ public class ExecutingTest extends TestLogger {
     }
 
     static class StopWithSavepointArguments extends CancellingArguments {
-        @Nullable private final String targetDirectory;
-        private final boolean terminal;
+        private final StopWithSavepointOperations stopWithSavepointOperations;
+        private final CompletableFuture<String> savepointFuture;
 
         public StopWithSavepointArguments(
                 ExecutionGraph executionGraph,
                 ExecutionGraphHandler executionGraphHandler,
                 OperatorCoordinatorHandler operatorCoordinatorHandle,
-                @Nullable String targetDirectory,
-                boolean terminal) {
+                StopWithSavepointOperations stopWithSavepointOperations,
+                CompletableFuture<String> savepointFuture) {
             super(executionGraph, executionGraphHandler, operatorCoordinatorHandle);
-            this.targetDirectory = targetDirectory;
-            this.terminal = terminal;
+            this.stopWithSavepointOperations = stopWithSavepointOperations;
+            this.savepointFuture = savepointFuture;
         }
     }
 

@@ -119,6 +119,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.concurrent.CompletableFuture.allOf;
+import static org.apache.flink.core.testutils.FlinkMatchers.containsCause;
 import static org.apache.flink.core.testutils.FlinkMatchers.containsMessage;
 import static org.apache.flink.runtime.checkpoint.CheckpointFailureReason.CHECKPOINT_COORDINATOR_SHUTDOWN;
 import static org.apache.flink.test.util.TestUtils.submitJobAndWaitForResult;
@@ -586,7 +587,7 @@ public class SavepointITCase extends TestLogger {
             if (ClusterOptions.isAdaptiveSchedulerEnabled(new Configuration())) {
                 assertThat(
                         actualException,
-                        containsMessage("Expected RuntimeException after snapshot creation"));
+                        containsMessage("Stop with savepoint operation could not be completed"));
             } else {
                 Optional<FlinkException> actualFlinkException =
                         ExceptionUtils.findThrowable(actualException, FlinkException.class);
@@ -604,9 +605,13 @@ public class SavepointITCase extends TestLogger {
 
     private static BiConsumer<JobID, ExecutionException> assertInSnapshotCreationFailure() {
         return (ignored, actualException) -> {
-            Optional<CheckpointException> actualFailureCause =
-                    ExceptionUtils.findThrowable(actualException, CheckpointException.class);
-            assertTrue(actualFailureCause.isPresent());
+            if (ClusterOptions.isAdaptiveSchedulerEnabled(new Configuration())) {
+                assertThat(actualException, containsCause(FlinkException.class));
+            } else {
+                Optional<CheckpointException> actualFailureCause =
+                        ExceptionUtils.findThrowable(actualException, CheckpointException.class);
+                assertTrue(actualFailureCause.isPresent());
+            }
         };
     }
 

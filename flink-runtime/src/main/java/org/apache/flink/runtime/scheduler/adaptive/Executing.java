@@ -20,6 +20,8 @@ package org.apache.flink.runtime.scheduler.adaptive;
 
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.runtime.JobException;
+import org.apache.flink.runtime.checkpoint.CompletedCheckpoint;
+import org.apache.flink.runtime.checkpoint.StopWithSavepointOperations;
 import org.apache.flink.runtime.execution.ExecutionState;
 import org.apache.flink.runtime.executiongraph.ArchivedExecutionGraph;
 import org.apache.flink.runtime.executiongraph.ExecutionGraph;
@@ -157,12 +159,18 @@ class Executing extends StateWithExecutionGraph implements ResourceConsumer {
 
         getLogger().info("Triggering stop-with-savepoint for job {}.", executionGraph.getJobID());
 
+        final StopWithSavepointOperations stopWithSavepointOperations =
+                new StopWithSavepointOperationsProvider(executionGraph);
+        final CompletableFuture<String> savepointFuture =
+                stopWithSavepointOperations
+                        .triggerSynchronousSavepoint(terminate, targetDirectory)
+                        .thenApply(CompletedCheckpoint::getExternalPointer);
         return context.goToStopWithSavepoint(
                 executionGraph,
                 getExecutionGraphHandler(),
                 getOperatorCoordinatorHandler(),
-                targetDirectory,
-                terminate);
+                stopWithSavepointOperations,
+                savepointFuture);
     }
 
     /** Context of the {@link Executing} state. */
@@ -237,18 +245,15 @@ class Executing extends StateWithExecutionGraph implements ResourceConsumer {
          *     StopWithSavepoint} state
          * @param operatorCoordinatorHandler operatorCoordinatorHandler to pass to the {@link
          *     StopWithSavepoint} state
-         * @param targetDirectory target for the savepoint, if provided. Otherwise the default
-         *     savepoint location will be used.
-         * @param terminate flag indicating whether to suspend to terminate after savepoint
-         *     completion.
+         * @param savepointFuture Future for the savepoint to complete.
          * @return Location of the savepoint.
          */
         CompletableFuture<String> goToStopWithSavepoint(
                 ExecutionGraph executionGraph,
                 ExecutionGraphHandler executionGraphHandler,
                 OperatorCoordinatorHandler operatorCoordinatorHandler,
-                @Nullable String targetDirectory,
-                boolean terminate);
+                StopWithSavepointOperations stopWithSavepointOperations,
+                CompletableFuture<String> savepointFuture);
     }
 
     /**

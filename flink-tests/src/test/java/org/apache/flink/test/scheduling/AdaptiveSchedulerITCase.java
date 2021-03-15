@@ -28,7 +28,6 @@ import org.apache.flink.configuration.ClusterOptions;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.JobManagerOptions;
 import org.apache.flink.core.execution.JobClient;
-import org.apache.flink.runtime.checkpoint.CheckpointException;
 import org.apache.flink.runtime.state.FunctionInitializationContext;
 import org.apache.flink.runtime.state.FunctionSnapshotContext;
 import org.apache.flink.runtime.testutils.CommonTestUtils;
@@ -163,7 +162,7 @@ public class AdaptiveSchedulerITCase extends TestLogger {
                     .get();
             fail("Expect exception");
         } catch (ExecutionException e) {
-            assertThat(e, containsCause(CheckpointException.class));
+            assertThat(e, containsCause(FlinkException.class));
         }
         // expect job to run again (maybe restart)
         CommonTestUtils.waitUntilCondition(
@@ -187,7 +186,7 @@ public class AdaptiveSchedulerITCase extends TestLogger {
                     .get();
             fail("Expect exception");
         } catch (ExecutionException e) {
-            assertThat(e, containsCause(RuntimeException.class));
+            assertThat(e, containsCause(FlinkException.class));
         }
         // expect job to run again (maybe restart)
         CommonTestUtils.waitUntilCondition(
@@ -215,7 +214,7 @@ public class AdaptiveSchedulerITCase extends TestLogger {
             client.stopWithSavepoint(false, savepointDirectory.getAbsolutePath()).get();
             fail("Expect failure of operation");
         } catch (ExecutionException e) {
-            assertThat(e, containsCause(CheckpointException.class));
+            assertThat(e, containsCause(FlinkException.class));
         }
 
         DummySource.awaitRunning();
