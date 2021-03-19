@@ -24,6 +24,7 @@ import org.apache.flink.configuration.SchedulerExecutionMode;
 import org.apache.flink.runtime.heartbeat.HeartbeatServices;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
 import org.apache.flink.runtime.jobgraph.JobGraph;
+import org.apache.flink.runtime.jobgraph.JobGraphConfigurationUtils;
 import org.apache.flink.runtime.jobmaster.DefaultSlotPoolServiceSchedulerFactory;
 import org.apache.flink.runtime.jobmaster.JobManagerRunner;
 import org.apache.flink.runtime.jobmaster.JobManagerRunnerImpl;
@@ -35,14 +36,18 @@ import org.apache.flink.runtime.jobmaster.factories.JobManagerJobMetricGroupFact
 import org.apache.flink.runtime.jobmaster.factories.JobMasterServiceFactory;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
 import org.apache.flink.runtime.rpc.RpcService;
-import org.apache.flink.runtime.scheduler.adaptive.ReactiveModeUtils;
 import org.apache.flink.runtime.shuffle.ShuffleMaster;
 import org.apache.flink.runtime.shuffle.ShuffleServiceLoader;
 import org.apache.flink.util.Preconditions;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /** Singleton default factory for {@link JobManagerRunnerImpl}. */
 public enum DefaultJobManagerRunnerFactory implements JobManagerRunnerFactory {
     INSTANCE;
+
+    private static final Logger LOG = LoggerFactory.getLogger(JobManagerRunnerFactory.class);
 
     @Override
     public JobManagerRunner createJobManagerRunner(
@@ -64,13 +69,15 @@ public enum DefaultJobManagerRunnerFactory implements JobManagerRunnerFactory {
                 DefaultSlotPoolServiceSchedulerFactory.fromConfiguration(
                         configuration, jobGraph.getJobType());
 
+        JobGraphConfigurationUtils.autoConfigureMaxParallelism(jobGraph);
         if (jobMasterConfiguration.getConfiguration().get(JobManagerOptions.SCHEDULER_MODE)
                 == SchedulerExecutionMode.REACTIVE) {
+            LOG.info("Configuring job parallelism for running in reactive mode.");
             Preconditions.checkState(
                     slotPoolServiceSchedulerFactory.getSchedulerType()
                             == JobManagerOptions.SchedulerType.Adaptive,
                     "Adaptive Scheduler is required for reactive mode");
-            ReactiveModeUtils.configureJobGraphForReactiveMode(jobGraph);
+            JobGraphConfigurationUtils.configureJobGraphForReactiveMode(jobGraph);
         }
 
         final ShuffleMaster<?> shuffleMaster =

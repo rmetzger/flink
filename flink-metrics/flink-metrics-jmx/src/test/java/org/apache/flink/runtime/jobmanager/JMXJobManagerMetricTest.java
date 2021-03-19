@@ -31,7 +31,7 @@ import org.apache.flink.runtime.checkpoint.CheckpointRetentionPolicy;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.execution.Environment;
 import org.apache.flink.runtime.jobgraph.JobGraph;
-import org.apache.flink.runtime.jobgraph.JobGraphBuilder;
+import org.apache.flink.runtime.jobgraph.JobGraphTestUtils;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobgraph.tasks.AbstractInvokable;
 import org.apache.flink.runtime.jobgraph.tasks.CheckpointCoordinatorConfiguration;
@@ -53,6 +53,7 @@ import java.time.Duration;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
+import static org.apache.flink.runtime.executiongraph.ExecutionGraphTestUtils.createNoOpVertex;
 import static org.junit.Assert.assertEquals;
 
 /** Tests to verify JMX reporter functionality on the JobManager. */
@@ -86,7 +87,7 @@ public class JMXJobManagerMetricTest extends TestLogger {
         Deadline deadline = Deadline.now().plus(Duration.ofMinutes(2));
 
         try {
-            JobVertex sourceJobVertex = new JobVertex("Source");
+            JobVertex sourceJobVertex = createNoOpVertex("Source", 1);
             sourceJobVertex.setInvokableClass(BlockingInvokable.class);
 
             final JobCheckpointingSettings jobCheckpointingSettings =
@@ -103,12 +104,8 @@ public class JMXJobManagerMetricTest extends TestLogger {
                                     0),
                             null);
 
-            final JobGraph jobGraph =
-                    JobGraphBuilder.newStreamingJobGraphBuilder()
-                            .setJobName("TestingJob")
-                            .addJobVertex(sourceJobVertex)
-                            .setJobCheckpointingSettings(jobCheckpointingSettings)
-                            .build();
+            final JobGraph jobGraph = JobGraphTestUtils.streamingJobGraph(sourceJobVertex);
+            jobGraph.setSnapshotSettings(jobCheckpointingSettings);
 
             ClusterClient<?> client = MINI_CLUSTER_RESOURCE.getClusterClient();
             client.submitJob(jobGraph).get();
@@ -125,7 +122,9 @@ public class JMXJobManagerMetricTest extends TestLogger {
             Set<ObjectName> nameSet =
                     mBeanServer.queryNames(
                             new ObjectName(
-                                    "org.apache.flink.jobmanager.job.lastCheckpointSize:job_name=TestingJob,*"),
+                                    String.format(
+                                            "org.apache.flink.jobmanager.job.lastCheckpointSize:job_name=%s,*",
+                                            jobGraph.getName())),
                             null);
             Assert.assertEquals(1, nameSet.size());
             assertEquals(-1L, mBeanServer.getAttribute(nameSet.iterator().next(), "Value"));
