@@ -89,8 +89,8 @@ import org.apache.flink.runtime.scheduler.UpdateSchedulerNgOnInternalFailuresLis
 import org.apache.flink.runtime.scheduler.adaptive.allocator.ReservedSlots;
 import org.apache.flink.runtime.scheduler.adaptive.allocator.SlotAllocator;
 import org.apache.flink.runtime.scheduler.adaptive.allocator.VertexParallelism;
-import org.apache.flink.runtime.scheduler.adaptive.scalingpolicy.ReactiveScaleUpController;
-import org.apache.flink.runtime.scheduler.adaptive.scalingpolicy.ScaleUpController;
+import org.apache.flink.runtime.scheduler.adaptive.scalingpolicy.CPUAutoscalingPolicy;
+import org.apache.flink.runtime.scheduler.adaptive.scalingpolicy.ScalingPolicy;
 import org.apache.flink.runtime.state.KeyGroupRange;
 import org.apache.flink.runtime.util.ResourceCounter;
 import org.apache.flink.util.ExceptionUtils;
@@ -143,7 +143,8 @@ public class AdaptiveScheduler
                 Restarting.Context,
                 Failing.Context,
                 Finished.Context,
-                StopWithSavepoint.Context {
+                StopWithSavepoint.Context,
+                ScalingPolicy.ScalingContext {
 
     private static final Logger LOG = LoggerFactory.getLogger(AdaptiveScheduler.class);
 
@@ -172,13 +173,14 @@ public class AdaptiveScheduler
 
     private final SlotAllocator slotAllocator;
 
-    private final ScaleUpController scaleUpController;
+    private final ScalingPolicy scalingPolicy;
 
     private final Duration initialResourceAllocationTimeout;
 
     private final Duration resourceStabilizationTimeout;
 
     private final ExecutionGraphFactory executionGraphFactory;
+    private final ScalingPolicy.SchedulerConfiguration scalingPolicySchedulerConfiguration;
 
     private State state = new Created(this, LOG);
 
@@ -190,6 +192,7 @@ public class AdaptiveScheduler
             new DefaultVertexAttemptNumberStore();
 
     private BackgroundTask<ExecutionGraph> backgroundTask = BackgroundTask.finishedBackgroundTask();
+    private ResourceCounter desiredResources;
 
     public AdaptiveScheduler(
             JobGraph jobGraph,
@@ -239,7 +242,9 @@ public class AdaptiveScheduler
         this.componentMainThreadExecutor = mainThreadExecutor;
         this.jobStatusListener = jobStatusListener;
 
-        this.scaleUpController = new ReactiveScaleUpController(configuration);
+        this.scalingPolicy = new CPUAutoscalingPolicy(configuration);
+
+        scalingPolicySchedulerConfiguration = scalingPolicy.getSchedulerConfiguration();
 
         this.initialResourceAllocationTimeout = initialResourceAllocationTimeout;
 
@@ -248,6 +253,17 @@ public class AdaptiveScheduler
         this.executionGraphFactory = executionGraphFactory;
 
         registerMetrics();
+    }
+
+    // TODO: can not execute in main thread, because user could do external IO
+    private void runPolicyCallback() {
+        scalingPolicy.scalingCallback(this);
+
+        // schedule next run
+        componentMainThreadExecutor.schedule(
+                this::runPolicyCallback,
+                scalingPolicySchedulerConfiguration.getScalingCallbackFrequencySeconds(),
+                TimeUnit.SECONDS);
     }
 
     private static void assertPreconditions(JobGraph jobGraph) throws RuntimeException {
@@ -285,6 +301,13 @@ public class AdaptiveScheduler
 
     @Override
     public void startScheduling() {
+        setDesiredResources(scalingPolicySchedulerConfiguration.getInitialDesiredResources());
+
+        componentMainThreadExecutor.schedule(
+                this::runPolicyCallback,
+                scalingPolicySchedulerConfiguration.getScalingCallbackFrequencySeconds(),
+                TimeUnit.SECONDS);
+
         state.as(Created.class)
                 .orElseThrow(
                         () ->
@@ -628,9 +651,6 @@ public class AdaptiveScheduler
 
     @Override
     public void goToWaitingForResources() {
-        final ResourceCounter desiredResources = calculateDesiredResources();
-        declarativeSlotPool.setResourceRequirements(desiredResources);
-
         transitionToState(
                 new WaitingForResources.Factory(
                         this,
@@ -881,7 +901,7 @@ public class AdaptiveScheduler
                             "Offering scale up to scale up controller with currentCumulativeParallelism={}, newCumulativeParallelism={}",
                             currentCumulativeParallelism,
                             newCumulativeParallelism);
-                    return scaleUpController.canScaleUp(
+                    return scalingPolicy.canScaleUp(
                             currentCumulativeParallelism, newCumulativeParallelism);
                 }
             }
@@ -1004,5 +1024,27 @@ public class AdaptiveScheduler
     @VisibleForTesting
     State getState() {
         return state;
+    }
+
+    @Override
+    public int getFreeSlots() {
+        return declarativeSlotPool.getFreeSlotsInformation().size();
+    }
+
+    @Override
+    public int getTotalSlots() {
+        return declarativeSlotPool.getAllSlotsInformation().size();
+    }
+
+    @Override
+    public ScalingPolicy.ScalingProposal computeScale(int slots)
+            throws ScalingPolicy.SlotsExceededException {
+        return null;
+    }
+
+    @Override
+    public void setDesiredResources(ResourceCounter desiredResources) {
+        this.desiredResources = desiredResources;
+        declarativeSlotPool.setResourceRequirements(desiredResources);
     }
 }
