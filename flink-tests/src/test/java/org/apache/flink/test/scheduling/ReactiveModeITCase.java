@@ -168,7 +168,7 @@ public class ReactiveModeITCase extends TestLogger {
                 Deadline.fromNow(Duration.ofMillis(10_000L)));
     }
 
-    private static class ParallelismTrackingSource implements ParallelSourceFunction<String> {
+    static class ParallelismTrackingSource implements ParallelSourceFunction<String> {
         private volatile boolean running = true;
 
         private static final InstanceTracker instances = new InstanceTracker();
@@ -198,7 +198,7 @@ public class ReactiveModeITCase extends TestLogger {
         }
     }
 
-    private static class ParallelismTrackingSink<T> extends RichSinkFunction<T> {
+    static class ParallelismTrackingSink<T> extends RichSinkFunction<T> {
 
         private static final InstanceTracker instances = new InstanceTracker();
 

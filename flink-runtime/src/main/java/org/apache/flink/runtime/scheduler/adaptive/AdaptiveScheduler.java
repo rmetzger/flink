@@ -257,7 +257,11 @@ public class AdaptiveScheduler
 
     // TODO: can not execute in main thread, because user could do external IO
     private void runPolicyCallback() {
-        scalingPolicy.scalingCallback(this);
+        try {
+            scalingPolicy.scalingCallback(this);
+        } catch (Throwable e) {
+            LOG.error("Error in callback", e);
+        }
 
         // schedule next run
         componentMainThreadExecutor.schedule(

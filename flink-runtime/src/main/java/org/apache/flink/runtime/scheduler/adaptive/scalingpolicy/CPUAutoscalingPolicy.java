@@ -31,8 +31,6 @@ import org.apache.http.impl.client.HttpClients;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-
 /** Noop. */
 public class CPUAutoscalingPolicy implements ScalingPolicy {
     private static final Logger LOG = LoggerFactory.getLogger(CPUAutoscalingPolicy.class);
@@ -83,6 +81,7 @@ public class CPUAutoscalingPolicy implements ScalingPolicy {
         return ResourceCounter.withResource(ResourceProfile.UNKNOWN, slots);
     }
 
+    // todo consider using MetricFetcherImpl, see also AbstractAggregatingMetricsHandler
     private static double getCpuLoad() {
         try (CloseableHttpClient client = HttpClients.createDefault()) {
             HttpGet request =
@@ -98,7 +97,7 @@ public class CPUAutoscalingPolicy implements ScalingPolicy {
                                             ArrayNode.class));
 
             return response.get(0).get("avg").asDouble();
-        } catch (IOException e) {
+        } catch (Throwable e) {
             LOG.info("Error while fetching CPU load", e);
             return -1;
         }

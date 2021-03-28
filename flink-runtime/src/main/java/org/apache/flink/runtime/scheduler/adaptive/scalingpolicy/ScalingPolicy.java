@@ -34,8 +34,10 @@ public interface ScalingPolicy {
 
     boolean canScaleUp(int currentCumulativeParallelism, int newCumulativeParallelism);
 
-    // provides the policy with the necessary data and interaction to try different scales, or
-    // commit to one
+    /**
+     * provides the policy with the necessary data and interaction to try different scales, or
+     * commit to one.
+     */
     interface ScalingContext {
         int getFreeSlots();
 
@@ -48,18 +50,21 @@ public interface ScalingPolicy {
         void setDesiredResources(ResourceCounter desiredResources);
     }
 
+    /** yolo. */
     interface SchedulerConfiguration {
         int getScalingCallbackFrequencySeconds();
 
         ResourceCounter getInitialDesiredResources();
     }
 
+    /** yolo. */
     interface ScalingProposal {
         Map<TaskInformation, Integer> getCurrentVertexParallelisms();
 
         Map<TaskInformation, Integer> getProposedVertexParallelisms();
     }
 
+    /** yolo. */
     interface TaskInformation {
         int getOriginalParallelism();
 
@@ -70,5 +75,6 @@ public interface ScalingPolicy {
         JobVertexID getId();
     }
 
+    /** yolo. */
     class SlotsExceededException extends Exception {}
 }
