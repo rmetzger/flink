@@ -18,10 +18,7 @@
 
 package org.apache.flink.runtime.scheduler.adaptive.scalingpolicy;
 
-import org.apache.flink.runtime.jobgraph.JobVertexID;
 import org.apache.flink.runtime.util.ResourceCounter;
-
-import java.util.Map;
 
 /** TODO: add reactive mode policy to validate. */
 public interface ScalingPolicy {
@@ -43,9 +40,6 @@ public interface ScalingPolicy {
 
         int getTotalSlots();
 
-        // ask the SlotAllocator to compute a ScalingProposal for a given number of slots
-        ScalingProposal computeScale(int slots) throws SlotsExceededException;
-
         // instruct scheduler to rescale to the provided number of slots.
         void setDesiredResources(ResourceCounter desiredResources);
     }
@@ -56,25 +50,4 @@ public interface ScalingPolicy {
 
         ResourceCounter getInitialDesiredResources();
     }
-
-    /** yolo. */
-    interface ScalingProposal {
-        Map<TaskInformation, Integer> getCurrentVertexParallelisms();
-
-        Map<TaskInformation, Integer> getProposedVertexParallelisms();
-    }
-
-    /** yolo. */
-    interface TaskInformation {
-        int getOriginalParallelism();
-
-        int getMaxParallelism();
-
-        int getName();
-
-        JobVertexID getId();
-    }
-
-    /** yolo. */
-    class SlotsExceededException extends Exception {}
 }

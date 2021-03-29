@@ -307,10 +307,12 @@ public class AdaptiveScheduler
     public void startScheduling() {
         setDesiredResources(scalingPolicySchedulerConfiguration.getInitialDesiredResources());
 
-        componentMainThreadExecutor.schedule(
-                this::runPolicyCallback,
-                scalingPolicySchedulerConfiguration.getScalingCallbackFrequencySeconds(),
-                TimeUnit.SECONDS);
+        if (scalingPolicySchedulerConfiguration.getScalingCallbackFrequencySeconds() > 0) {
+            componentMainThreadExecutor.schedule(
+                    this::runPolicyCallback,
+                    scalingPolicySchedulerConfiguration.getScalingCallbackFrequencySeconds(),
+                    TimeUnit.SECONDS);
+        }
 
         state.as(Created.class)
                 .orElseThrow(
@@ -1038,12 +1040,6 @@ public class AdaptiveScheduler
     @Override
     public int getTotalSlots() {
         return declarativeSlotPool.getAllSlotsInformation().size();
-    }
-
-    @Override
-    public ScalingPolicy.ScalingProposal computeScale(int slots)
-            throws ScalingPolicy.SlotsExceededException {
-        return null;
     }
 
     @Override
