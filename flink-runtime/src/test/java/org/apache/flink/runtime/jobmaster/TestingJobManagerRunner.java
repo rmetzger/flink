@@ -40,11 +40,14 @@ public class TestingJobManagerRunner implements JobManagerRunner {
 
     private final OneShotLatch closeAsyncCalledLatch = new OneShotLatch();
 
-    private TestingJobManagerRunner(
+    private JobManagerStatusListener jobManagerStatusListener;
+
+    protected TestingJobManagerRunner(
             JobID jobId,
             boolean blockingTermination,
             CompletableFuture<JobMasterGateway> jobMasterGatewayFuture,
-            CompletableFuture<JobManagerRunnerResult> resultFuture) {
+            CompletableFuture<JobManagerRunnerResult> resultFuture,
+            JobManagerStatusListener jobManagerStatusListener) {
         this.jobId = jobId;
         this.blockingTermination = blockingTermination;
         this.jobMasterGatewayFuture = jobMasterGatewayFuture;
@@ -54,10 +57,16 @@ public class TestingJobManagerRunner implements JobManagerRunner {
         terminationFuture.whenComplete(
                 (ignored, ignoredThrowable) ->
                         resultFuture.completeExceptionally(new JobNotFinishedException(jobId)));
+
+        this.jobManagerStatusListener = jobManagerStatusListener;
     }
 
     @Override
-    public void start() throws Exception {}
+    public void start() throws Exception {
+        Preconditions.checkNotNull(
+                jobManagerStatusListener, "JobManager status listener must be set");
+        jobManagerStatusListener.onJobManagerStarted(this);
+    }
 
     @Override
     public CompletableFuture<JobMasterGateway> getJobMasterGateway() {
@@ -112,6 +121,17 @@ public class TestingJobManagerRunner implements JobManagerRunner {
         this.jobMasterGatewayFuture.complete(testingJobMasterGateway);
     }
 
+    public void failInitialization(Throwable failure) {
+        Preconditions.checkNotNull(
+                jobManagerStatusListener, "JobManager status listener must be set");
+        jobManagerStatusListener.onJobManagerInitializationFailed(failure);
+    }
+
+    public void setJobManagerStatusListener(JobManagerStatusListener jobManagerStatusListener) {
+        Preconditions.checkNotNull(jobManagerStatusListener, "The passed listener is null");
+        this.jobManagerStatusListener = jobManagerStatusListener;
+    }
+
     /** {@code Builder} for instantiating {@link TestingJobManagerRunner} instances. */
     public static class Builder {
         private JobID jobId = null;
@@ -119,6 +139,8 @@ public class TestingJobManagerRunner implements JobManagerRunner {
         private CompletableFuture<JobMasterGateway> jobMasterGatewayFuture =
                 new CompletableFuture<>();
         private CompletableFuture<JobManagerRunnerResult> resultFuture = new CompletableFuture<>();
+        private JobManagerStatusListener jobManagerStatusListener =
+                new TestingJobManagerStatusListener();
 
         public Builder setJobId(JobID jobId) {
             this.jobId = jobId;
@@ -127,6 +149,11 @@ public class TestingJobManagerRunner implements JobManagerRunner {
 
         public Builder setBlockingTermination(boolean blockingTermination) {
             this.blockingTermination = blockingTermination;
+            return this;
+        }
+
+        public Builder setJobManagerStatusListener(JobManagerStatusListener listener) {
+            this.jobManagerStatusListener = listener;
             return this;
         }
 
@@ -146,7 +173,28 @@ public class TestingJobManagerRunner implements JobManagerRunner {
         public TestingJobManagerRunner build() {
             Preconditions.checkNotNull(jobId);
             return new TestingJobManagerRunner(
-                    jobId, blockingTermination, jobMasterGatewayFuture, resultFuture);
+                    jobId,
+                    blockingTermination,
+                    jobMasterGatewayFuture,
+                    resultFuture,
+                    jobManagerStatusListener);
+        }
+    }
+
+    private static class TestingJobManagerStatusListener implements JobManagerStatusListener {
+        @Override
+        public void onJobManagerStarted(JobManagerRunner jobManagerRunner) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void onJobManagerStopped() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void onJobManagerInitializationFailed(Throwable initializationFailure) {
+            throw new RuntimeException("Implement me", initializationFailure);
         }
     }
 }
