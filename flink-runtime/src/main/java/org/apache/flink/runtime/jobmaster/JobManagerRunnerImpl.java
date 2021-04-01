@@ -19,7 +19,6 @@
 package org.apache.flink.runtime.jobmaster;
 
 import org.apache.flink.api.common.JobID;
-import org.apache.flink.runtime.client.JobInitializationException;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.execution.librarycache.LibraryCacheManager;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
@@ -101,6 +100,8 @@ public class JobManagerRunnerImpl
 
     private volatile CompletableFuture<JobMasterGateway> leaderGatewayFuture;
 
+    private final JobManagerStatusListener jobManagerStatusListener;
+
     // ------------------------------------------------------------------------
 
     /**
@@ -117,8 +118,10 @@ public class JobManagerRunnerImpl
             final LibraryCacheManager.ClassLoaderLease classLoaderLease,
             final Executor executor,
             final FatalErrorHandler fatalErrorHandler,
-            long initializationTimestamp)
+            long initializationTimestamp,
+            JobManagerStatusListener jobManagerStatusListener)
             throws Exception {
+        this.jobManagerStatusListener = jobManagerStatusListener;
 
         this.resultFuture = new CompletableFuture<>();
         this.terminationFuture = new CompletableFuture<>();
@@ -299,14 +302,16 @@ public class JobManagerRunnerImpl
             }
 
             leadershipOperation =
-                    leadershipOperation.thenRun(
+                    leadershipOperation.thenRunAsync(
                             ThrowingRunnable.unchecked(
                                     () -> {
                                         synchronized (lock) {
                                             verifyJobSchedulingStatusAndStartJobManager(
                                                     leaderSessionID);
                                         }
-                                    }));
+                                    }),
+                            executor); // run in separate thread to not block main thread on
+            // JobManager initialization.
 
             handleException(leadershipOperation, "Could not start the job manager.");
         }
@@ -367,6 +372,8 @@ public class JobManagerRunnerImpl
                             userCodeClassLoader,
                             initializationTimestamp);
 
+            jobManagerStatusListener.onJobManagerStarted(this);
+
             jobMasterService = newJobMasterService;
 
             jobMasterService
@@ -383,11 +390,8 @@ public class JobManagerRunnerImpl
                                     }
                                 }
                             });
-        } catch (Exception e) {
-            resultFuture.complete(
-                    JobManagerRunnerResult.forInitializationFailure(
-                            new JobInitializationException(
-                                    jobGraph.getJobID(), "Could not start the JobMaster.", e)));
+        } catch (Exception initializationException) {
+            jobManagerStatusListener.onJobManagerInitializationFailed(initializationException);
         }
     }
 
@@ -461,6 +465,10 @@ public class JobManagerRunnerImpl
 
             final CompletableFuture<Void> jobMasterServiceTerminationFuture =
                     jobMasterService.closeAsync();
+
+            jobMasterServiceTerminationFuture.thenRun(
+                    jobManagerStatusListener::onJobManagerStopped);
+
             jobMasterService = null;
 
             return jobMasterServiceTerminationFuture;

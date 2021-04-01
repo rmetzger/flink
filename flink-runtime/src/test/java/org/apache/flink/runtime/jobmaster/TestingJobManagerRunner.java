@@ -75,6 +75,11 @@ public class TestingJobManagerRunner implements JobManagerRunner {
     }
 
     @Override
+    public CompletableFuture<JobManagerRunner> getJobManagerRunner() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public CompletableFuture<Void> closeAsync() {
         if (!blockingTermination) {
             terminationFuture.complete(null);

@@ -42,6 +42,7 @@ import org.apache.flink.runtime.jobgraph.JobGraphTestUtils;
 import org.apache.flink.runtime.jobmanager.JobGraphWriter;
 import org.apache.flink.runtime.jobmaster.JobManagerRunner;
 import org.apache.flink.runtime.jobmaster.JobManagerSharedServices;
+import org.apache.flink.runtime.jobmaster.JobManagerStatusListener;
 import org.apache.flink.runtime.jobmaster.JobNotFinishedException;
 import org.apache.flink.runtime.jobmaster.TestingJobManagerRunner;
 import org.apache.flink.runtime.jobmaster.factories.JobManagerJobMetricGroupFactory;
@@ -651,7 +652,8 @@ public class DispatcherResourceCleanupTest extends TestLogger {
                 JobManagerSharedServices jobManagerServices,
                 JobManagerJobMetricGroupFactory jobManagerJobMetricGroupFactory,
                 FatalErrorHandler fatalErrorHandler,
-                long initializationTimestamp) {
+                long initializationTimestamp,
+                JobManagerStatusListener jobManagerStatusListener) {
             return Optional.ofNullable(jobManagerRunners.poll())
                     .orElseThrow(
                             () ->
@@ -677,7 +679,8 @@ public class DispatcherResourceCleanupTest extends TestLogger {
                 JobManagerSharedServices jobManagerServices,
                 JobManagerJobMetricGroupFactory jobManagerJobMetricGroupFactory,
                 FatalErrorHandler fatalErrorHandler,
-                long initializationTimestamp)
+                long initializationTimestamp,
+                JobManagerStatusListener jobManagerStatusListener)
                 throws Exception {
             throw testException;
         }

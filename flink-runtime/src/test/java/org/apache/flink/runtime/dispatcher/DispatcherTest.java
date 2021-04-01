@@ -47,6 +47,7 @@ import org.apache.flink.runtime.jobmanager.JobGraphWriter;
 import org.apache.flink.runtime.jobmaster.JobManagerRunner;
 import org.apache.flink.runtime.jobmaster.JobManagerRunnerResult;
 import org.apache.flink.runtime.jobmaster.JobManagerSharedServices;
+import org.apache.flink.runtime.jobmaster.JobManagerStatusListener;
 import org.apache.flink.runtime.jobmaster.JobNotFinishedException;
 import org.apache.flink.runtime.jobmaster.JobResult;
 import org.apache.flink.runtime.jobmaster.TestingJobManagerRunner;
@@ -234,7 +235,8 @@ public class DispatcherTest extends TestLogger {
                 JobManagerSharedServices jobManagerServices,
                 JobManagerJobMetricGroupFactory jobManagerJobMetricGroupFactory,
                 FatalErrorHandler fatalErrorHandler,
-                long initializationTimestamp) {
+                long initializationTimestamp,
+                JobManagerStatusListener jobManagerStatusListener) {
             initializationTimestampQueue.offer(initializationTimestamp);
             return new TestingJobManagerRunner.Builder().setJobId(jobGraph.getJobID()).build();
         }
@@ -989,7 +991,8 @@ public class DispatcherTest extends TestLogger {
                 JobManagerSharedServices jobManagerSharedServices,
                 JobManagerJobMetricGroupFactory jobManagerJobMetricGroupFactory,
                 FatalErrorHandler fatalErrorHandler,
-                long initializationTimestamp)
+                long initializationTimestamp,
+                JobManagerStatusListener jobManagerStatusListener)
                 throws Exception {
             jobManagerRunnerCreationLatch.run();
 
@@ -1003,7 +1006,8 @@ public class DispatcherTest extends TestLogger {
                             jobManagerSharedServices,
                             jobManagerJobMetricGroupFactory,
                             fatalErrorHandler,
-                            initializationTimestamp);
+                            initializationTimestamp,
+                            jobManagerStatusListener);
 
             TestingJobMasterGateway testingJobMasterGateway =
                     new TestingJobMasterGatewayBuilder()
@@ -1078,7 +1082,8 @@ public class DispatcherTest extends TestLogger {
                 JobManagerSharedServices jobManagerSharedServices,
                 JobManagerJobMetricGroupFactory jobManagerJobMetricGroupFactory,
                 FatalErrorHandler fatalErrorHandler,
-                long initializationTimestamp)
+                long initializationTimestamp,
+                JobManagerStatusListener jobManagerStatusListener)
                 throws Exception {
             assertEquals(expectedJobId, jobGraph.getJobID());
 
@@ -1093,7 +1098,8 @@ public class DispatcherTest extends TestLogger {
                     jobManagerSharedServices,
                     jobManagerJobMetricGroupFactory,
                     fatalErrorHandler,
-                    initializationTimestamp);
+                    initializationTimestamp,
+                    jobManagerStatusListener);
         }
     }
 

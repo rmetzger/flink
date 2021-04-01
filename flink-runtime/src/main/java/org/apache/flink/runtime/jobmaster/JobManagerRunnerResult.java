@@ -30,24 +30,16 @@ public final class JobManagerRunnerResult {
 
     @Nullable private final ExecutionGraphInfo executionGraphInfo;
 
-    @Nullable private final Throwable failure;
-
-    private JobManagerRunnerResult(
-            @Nullable ExecutionGraphInfo executionGraphInfo, @Nullable Throwable failure) {
+    private JobManagerRunnerResult(@Nullable ExecutionGraphInfo executionGraphInfo) {
         this.executionGraphInfo = executionGraphInfo;
-        this.failure = failure;
     }
 
     public boolean isSuccess() {
-        return executionGraphInfo != null && failure == null;
+        return executionGraphInfo != null;
     }
 
     public boolean isJobNotFinished() {
-        return executionGraphInfo == null && failure == null;
-    }
-
-    public boolean isInitializationFailure() {
-        return executionGraphInfo == null && failure != null;
+        return executionGraphInfo == null;
     }
 
     /**
@@ -61,17 +53,6 @@ public final class JobManagerRunnerResult {
         return executionGraphInfo;
     }
 
-    /**
-     * This method returns the initialization failure.
-     *
-     * @return the initialization failure
-     * @throws IllegalStateException if the result is not an initialization failure
-     */
-    public Throwable getInitializationFailure() {
-        Preconditions.checkState(isInitializationFailure());
-        return failure;
-    }
-
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -81,24 +62,19 @@ public final class JobManagerRunnerResult {
             return false;
         }
         JobManagerRunnerResult that = (JobManagerRunnerResult) o;
-        return Objects.equals(executionGraphInfo, that.executionGraphInfo)
-                && Objects.equals(failure, that.failure);
+        return Objects.equals(executionGraphInfo, that.executionGraphInfo);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(executionGraphInfo, failure);
+        return Objects.hash(executionGraphInfo);
     }
 
     public static JobManagerRunnerResult forJobNotFinished() {
-        return new JobManagerRunnerResult(null, null);
+        return new JobManagerRunnerResult(null);
     }
 
     public static JobManagerRunnerResult forSuccess(ExecutionGraphInfo executionGraphInfo) {
-        return new JobManagerRunnerResult(executionGraphInfo, null);
-    }
-
-    public static JobManagerRunnerResult forInitializationFailure(Throwable failure) {
-        return new JobManagerRunnerResult(null, failure);
+        return new JobManagerRunnerResult(executionGraphInfo);
     }
 }

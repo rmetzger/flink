@@ -28,6 +28,7 @@ import org.apache.flink.runtime.jobmaster.DefaultSlotPoolServiceSchedulerFactory
 import org.apache.flink.runtime.jobmaster.JobManagerRunner;
 import org.apache.flink.runtime.jobmaster.JobManagerRunnerImpl;
 import org.apache.flink.runtime.jobmaster.JobManagerSharedServices;
+import org.apache.flink.runtime.jobmaster.JobManagerStatusListener;
 import org.apache.flink.runtime.jobmaster.JobMasterConfiguration;
 import org.apache.flink.runtime.jobmaster.SlotPoolServiceSchedulerFactory;
 import org.apache.flink.runtime.jobmaster.factories.DefaultJobMasterServiceFactory;
@@ -53,7 +54,8 @@ public enum DefaultJobManagerRunnerFactory implements JobManagerRunnerFactory {
             JobManagerSharedServices jobManagerServices,
             JobManagerJobMetricGroupFactory jobManagerJobMetricGroupFactory,
             FatalErrorHandler fatalErrorHandler,
-            long initializationTimestamp)
+            long initializationTimestamp,
+            JobManagerStatusListener jobManagerStatusListener)
             throws Exception {
 
         final JobMasterConfiguration jobMasterConfiguration =
@@ -96,6 +98,7 @@ public enum DefaultJobManagerRunnerFactory implements JobManagerRunnerFactory {
                         .registerClassLoaderLease(jobGraph.getJobID()),
                 jobManagerServices.getScheduledExecutorService(),
                 fatalErrorHandler,
-                initializationTimestamp);
+                initializationTimestamp,
+                jobManagerStatusListener);
     }
 }

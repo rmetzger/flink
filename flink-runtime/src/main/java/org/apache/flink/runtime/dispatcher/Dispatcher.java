@@ -28,7 +28,6 @@ import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.blob.BlobServer;
 import org.apache.flink.runtime.checkpoint.Checkpoints;
 import org.apache.flink.runtime.client.DuplicateJobSubmissionException;
-import org.apache.flink.runtime.client.JobInitializationException;
 import org.apache.flink.runtime.client.JobSubmissionException;
 import org.apache.flink.runtime.clusterframework.ApplicationStatus;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
@@ -393,19 +392,28 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
         runJob(jobGraph, ExecutionType.SUBMISSION);
     }
 
-    private void runJob(JobGraph jobGraph, ExecutionType executionType) {
+    private void runJob(JobGraph jobGraph, ExecutionType executionType) throws Exception {
         Preconditions.checkState(!runningJobs.containsKey(jobGraph.getJobID()));
         long initializationTimestamp = System.currentTimeMillis();
-        CompletableFuture<JobManagerRunner> jobManagerRunnerFuture =
-                createJobManagerRunner(jobGraph, initializationTimestamp);
 
         DispatcherJob dispatcherJob =
                 DispatcherJob.createFor(
-                        jobManagerRunnerFuture,
-                        jobGraph.getJobID(),
-                        jobGraph.getName(),
-                        initializationTimestamp);
+                        jobGraph.getJobID(), jobGraph.getName(), initializationTimestamp);
         runningJobs.put(jobGraph.getJobID(), dispatcherJob);
+
+        JobManagerRunner runner =
+                jobManagerRunnerFactory.createJobManagerRunner(
+                        jobGraph,
+                        configuration,
+                        getRpcService(),
+                        highAvailabilityServices,
+                        heartbeatServices,
+                        jobManagerSharedServices,
+                        new DefaultJobManagerJobMetricGroupFactory(jobManagerMetricGroup),
+                        fatalErrorHandler,
+                        initializationTimestamp,
+                        dispatcherJob);
+        runner.start();
 
         final JobID jobId = jobGraph.getJobID();
 
@@ -465,38 +473,6 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
         }
 
         return CleanupJobState.LOCAL;
-    }
-
-    CompletableFuture<JobManagerRunner> createJobManagerRunner(
-            JobGraph jobGraph, long initializationTimestamp) {
-        final RpcService rpcService = getRpcService();
-        return CompletableFuture.supplyAsync(
-                () -> {
-                    try {
-                        JobManagerRunner runner =
-                                jobManagerRunnerFactory.createJobManagerRunner(
-                                        jobGraph,
-                                        configuration,
-                                        rpcService,
-                                        highAvailabilityServices,
-                                        heartbeatServices,
-                                        jobManagerSharedServices,
-                                        new DefaultJobManagerJobMetricGroupFactory(
-                                                jobManagerMetricGroup),
-                                        fatalErrorHandler,
-                                        initializationTimestamp);
-                        runner.start();
-                        return runner;
-                    } catch (Exception e) {
-                        throw new CompletionException(
-                                new JobInitializationException(
-                                        jobGraph.getJobID(),
-                                        "Could not instantiate JobManager.",
-                                        e));
-                    }
-                },
-                ioExecutor); // do not use main thread executor. Otherwise, Dispatcher is blocked on
-        // JobManager creation
     }
 
     @Override
@@ -598,6 +574,7 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
     @Override
     public CompletableFuture<JobStatus> requestJobStatus(JobID jobId, Time timeout) {
         Optional<DispatcherJob> maybeJob = getDispatcherJob(jobId);
+        log.info("requestJobStatus.maybeJob = " + maybeJob);
         return maybeJob.map(job -> job.requestJobStatus(timeout))
                 .orElseGet(
                         () -> {
