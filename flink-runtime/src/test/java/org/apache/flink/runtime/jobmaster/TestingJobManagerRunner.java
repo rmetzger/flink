@@ -74,8 +74,7 @@ public class TestingJobManagerRunner implements JobManagerRunner {
         return jobId;
     }
 
-    @Override
-    public CompletableFuture<JobManagerRunner> getJobManagerRunner() {
+    public CompletableFuture<JobMasterGateway> getJobMasterGatewayFuture() {
         throw new UnsupportedOperationException();
     }
 

@@ -93,7 +93,7 @@ public class JobMasterITCase extends TestLogger {
 
         @Override
         public SimpleVersionedSerializer<MockSplit> getSplitSerializer() {
-            throw new UnsupportedOperationException();
+            throw new RuntimeException("Intentional Test failure");
         }
 
         @Override

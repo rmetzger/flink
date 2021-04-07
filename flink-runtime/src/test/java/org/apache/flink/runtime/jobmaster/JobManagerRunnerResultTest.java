@@ -23,13 +23,6 @@ import org.apache.flink.runtime.scheduler.ExecutionGraphInfo;
 import org.apache.flink.util.FlinkException;
 import org.apache.flink.util.TestLogger;
 
-import org.junit.Test;
-
-import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
-
 /** Tests for the {@link JobManagerRunnerResult}. */
 public class JobManagerRunnerResultTest extends TestLogger {
 
@@ -37,7 +30,7 @@ public class JobManagerRunnerResultTest extends TestLogger {
             new ExecutionGraphInfo(new ArchivedExecutionGraphBuilder().build());
     private final FlinkException testException = new FlinkException("test exception");
 
-    @Test
+    /*  @Test
     public void testSuccessfulJobManagerResult() {
         final JobManagerRunnerResult jobManagerRunnerResult =
                 JobManagerRunnerResult.forSuccess(executionGraphInfo);
@@ -113,5 +106,5 @@ public class JobManagerRunnerResultTest extends TestLogger {
                 JobManagerRunnerResult.forSuccess(executionGraphInfo);
 
         jobManagerRunnerResult.getInitializationFailure();
-    }
+    } */
 }

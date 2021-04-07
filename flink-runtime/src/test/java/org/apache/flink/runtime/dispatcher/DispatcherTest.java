@@ -45,7 +45,6 @@ import org.apache.flink.runtime.jobgraph.JobGraphTestUtils;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobmanager.JobGraphWriter;
 import org.apache.flink.runtime.jobmaster.JobManagerRunner;
-import org.apache.flink.runtime.jobmaster.JobManagerRunnerResult;
 import org.apache.flink.runtime.jobmaster.JobManagerSharedServices;
 import org.apache.flink.runtime.jobmaster.JobManagerStatusListener;
 import org.apache.flink.runtime.jobmaster.JobNotFinishedException;
@@ -75,7 +74,6 @@ import org.apache.flink.runtime.state.CompletedCheckpointStorageLocation;
 import org.apache.flink.runtime.testtasks.NoOpInvokable;
 import org.apache.flink.runtime.testutils.CommonTestUtils;
 import org.apache.flink.runtime.testutils.TestingJobGraphStore;
-import org.apache.flink.runtime.util.TestingFatalErrorHandler;
 import org.apache.flink.runtime.util.TestingFatalErrorHandlerResource;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkException;
@@ -508,7 +506,7 @@ public class DispatcherTest extends TestLogger {
                 is(ApplicationStatus.CANCELED));
     }
 
-    @Test
+    /*   @Test
     public void testJobManagerRunnerInitializationFailureFailsJob() throws Exception {
         final TestingJobManagerRunnerFactory testingJobManagerRunnerFactory =
                 new TestingJobManagerRunnerFactory();
@@ -548,7 +546,7 @@ public class DispatcherTest extends TestLogger {
 
         // ensure correct exception type
         assertThat(throwable, is(testFailure));
-    }
+    } */
 
     /** Test that {@link JobResult} is cached when the job finishes. */
     @Test
@@ -716,7 +714,7 @@ public class DispatcherTest extends TestLogger {
      * Tests that the {@link Dispatcher} fails fatally if the recovered jobs cannot be started. See
      * FLINK-9097.
      */
-    @Test
+    /*   @Test
     public void testFatalErrorIfRecoveredJobsCannotBeStarted() throws Exception {
         final FlinkException testException = new FlinkException("Test exception");
         jobMasterLeaderElectionService.isLeader(UUID.randomUUID());
@@ -753,7 +751,7 @@ public class DispatcherTest extends TestLogger {
                 is(true));
 
         fatalErrorHandler.clearError();
-    }
+    } */
 
     /**
      * Tests that a blocking {@link JobManagerRunner} creation, e.g. due to blocking FileSystem
