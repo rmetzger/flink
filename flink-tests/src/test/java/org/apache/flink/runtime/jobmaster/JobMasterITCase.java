@@ -62,7 +62,7 @@ public class JobMasterITCase extends TestLogger {
             see.execute();
         } catch (Exception e) {
             log.info("caught", e);
-            assertThat(e, containsMessage(FAILURE_MESSAGE));
+            assertThat(e, containsMessage("Context was not yet initialized"));
         }
     }
 
@@ -82,7 +82,7 @@ public class JobMasterITCase extends TestLogger {
         public SplitEnumerator<MockSplit, Void> createEnumerator(
                 SplitEnumeratorContext<MockSplit> enumContext) throws Exception {
             // here, we fail in the JobMaster
-            throw new RuntimeException("Intentional Test failure");
+            throw new RuntimeException(FAILURE_MESSAGE);
         }
 
         @Override
@@ -93,7 +93,7 @@ public class JobMasterITCase extends TestLogger {
 
         @Override
         public SimpleVersionedSerializer<MockSplit> getSplitSerializer() {
-            throw new RuntimeException("Intentional Test failure");
+            throw new RuntimeException(FAILURE_MESSAGE);
         }
 
         @Override
