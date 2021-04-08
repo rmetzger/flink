@@ -37,22 +37,32 @@ public class DispatcherJobStatus {
     }
 
     public void setJobManagerCreated(JobManagerRunner runner) {
-        Preconditions.checkState(status == Status.INITIALIZING, "JobManager must be initializing");
+        Preconditions.checkState(
+                status != Status.JOB_MANAGER_CREATED_OR_INIT_FAILED,
+                "JobManager has been created already");
         this.jobManagerRunnerFuture.complete(runner);
-        status = Status.JOB_MANAGER_CREATED;
+        status = Status.JOB_MANAGER_CREATED_OR_INIT_FAILED;
+    }
+
+    public void setJobManagerCreationFailed(Throwable failureCause) {
+        Preconditions.checkState(
+                status != Status.JOB_MANAGER_CREATED_OR_INIT_FAILED,
+                "JobManager has been created already");
+        this.jobManagerRunnerFuture.completeExceptionally(failureCause);
+        status = Status.JOB_MANAGER_CREATED_OR_INIT_FAILED;
     }
 
     public void setCancelling() {
-        Preconditions.checkState(status == Status.INITIALIZING);
+        Preconditions.checkState(status == Status.INITIALIZING, "JobManager must be initializing");
         status = Status.CANCELLING;
     }
 
     public void setInitializing() {
         Preconditions.checkState(
-                status == Status.JOB_MANAGER_CREATED || status == Status.CANCELLING,
+                status == Status.JOB_MANAGER_CREATED_OR_INIT_FAILED || status == Status.CANCELLING,
                 "JobManager must be in state created or cancelling to be stopped");
         jobManagerRunnerFuture.completeExceptionally(
-                new FlinkException("JobManager is not valid anymore"));
+                new FlinkException("Initializing new JobManager."));
         jobManagerRunnerFuture = new CompletableFuture<>();
         status = Status.INITIALIZING;
     }
@@ -68,8 +78,8 @@ public class DispatcherJobStatus {
         return status == Status.INITIALIZING;
     }
 
-    public boolean isJobManagerCreated() {
-        return status == Status.JOB_MANAGER_CREATED;
+    public boolean isJobManagerCreatedOrFailed() {
+        return status == Status.JOB_MANAGER_CREATED_OR_INIT_FAILED;
     }
 
     public boolean isCancelling() {
@@ -85,7 +95,7 @@ public class DispatcherJobStatus {
     private enum Status {
         // We are waiting for the JobManager to be created
         INITIALIZING(JobStatus.INITIALIZING),
-        JOB_MANAGER_CREATED(null),
+        JOB_MANAGER_CREATED_OR_INIT_FAILED(null),
         // waiting for cancellation
         CANCELLING(JobStatus.CANCELLING);
 

@@ -48,7 +48,7 @@ public final class DispatcherJob implements AutoCloseableAsync, JobManagerStatus
 
     private final Logger log = LoggerFactory.getLogger(DispatcherJob.class);
 
-    private final CompletableFuture<DispatcherJobResult> jobResultFuture;
+    private CompletableFuture<DispatcherJobResult> jobResultFuture;
 
     // if the termination future is set, we are signaling that this DispatcherJob is awaiting a
     // termination.
@@ -117,6 +117,7 @@ public final class DispatcherJob implements AutoCloseableAsync, JobManagerStatus
             Preconditions.checkState(
                     jobResultFuture.isDone(),
                     "Expecting job result to be complete when JobManager has been stopped");
+            jobResultFuture = new CompletableFuture<>();
             jobStatus.setInitializing();
         }
     }
@@ -127,6 +128,7 @@ public final class DispatcherJob implements AutoCloseableAsync, JobManagerStatus
             Preconditions.checkState(
                     jobStatus.isInitializing(),
                     "Initialization can only fail while being in state initializing");
+            jobStatus.setJobManagerCreationFailed(initializationFailure);
             if (terminationFuture != null) {
                 // This DispatcherJob is waiting for a termination.
                 terminationFuture.complete(null);
@@ -166,8 +168,7 @@ public final class DispatcherJob implements AutoCloseableAsync, JobManagerStatus
      */
     public CompletableFuture<Acknowledge> cancel(Time timeout) {
         synchronized (lock) {
-            if (jobStatus.isJobManagerCreated()) {
-                jobStatus.setCancelling();
+            if (jobStatus.isJobManagerCreatedOrFailed()) {
                 return getJobMasterGateway()
                         .thenCompose(jobMasterGateway -> jobMasterGateway.cancel(timeout));
             } else {
@@ -209,20 +210,19 @@ public final class DispatcherJob implements AutoCloseableAsync, JobManagerStatus
                                 executionGraphInfo.getArchivedExecutionGraph().getState());
     }
 
-    boolean isJobManagerCreated() {
+    boolean isJobManagerCreatedOrFailed() {
         synchronized (lock) {
-            return jobStatus.isJobManagerCreated();
+            return jobStatus.isJobManagerCreatedOrFailed();
         }
     }
 
     /** Returns a future completing to the ExecutionGraphInfo of the job. */
     public CompletableFuture<ExecutionGraphInfo> requestJob(Time timeout) {
         synchronized (lock) {
-            if (jobStatus.isJobManagerCreated()) {
+            if (jobStatus.isJobManagerCreatedOrFailed()) {
                 if (jobResultFuture.isDone()) { // job is not running anymore
                     return jobResultFuture.thenApply(DispatcherJobResult::getExecutionGraphInfo);
                 }
-                // job is still running
                 return getJobMasterGateway()
                         .thenCompose(jobMasterGateway -> jobMasterGateway.requestJob(timeout));
             } else {
@@ -254,13 +254,26 @@ public final class DispatcherJob implements AutoCloseableAsync, JobManagerStatus
         }
     }
 
+    /**
+     * Closes this DispatcherJob instance. If the JobManager has been initialized already, we close
+     * it, otherwise, we wait for the initialization to be finished, and then close it.
+     *
+     * @return A future which completes when the DispatcherJob has closed.
+     */
     @Override
     public CompletableFuture<Void> closeAsync() {
         synchronized (lock) {
-            if (jobStatus.isJobManagerCreated()) {
-                return jobStatus
-                        .getJobManagerRunnerFuture()
-                        .thenCompose(AutoCloseableAsync::closeAsync);
+            if (jobStatus.isJobManagerCreatedOrFailed()) {
+                final CompletableFuture<JobManagerRunner> jobManagerRunnerFuture =
+                        jobStatus.getJobManagerRunnerFuture();
+                if (jobManagerRunnerFuture.isCompletedExceptionally()) {
+                    // initialization has failed.
+                    return CompletableFuture.completedFuture(null);
+                } else {
+                    // JobManager is running: close it.
+                    return jobManagerRunnerFuture.thenCompose(AutoCloseableAsync::closeAsync);
+                }
+
             } else {
                 Preconditions.checkState(terminationFuture == null);
                 // wait for initialization / cancellation to be finished

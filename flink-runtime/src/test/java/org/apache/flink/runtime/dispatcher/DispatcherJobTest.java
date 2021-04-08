@@ -54,7 +54,7 @@ public class DispatcherJobTest extends TestLogger {
         TestContext testContext = createTestContext();
         DispatcherJob dispatcherJob = testContext.getDispatcherJob();
 
-        assertThat(dispatcherJob.isJobManagerCreated(), is(false));
+        assertThat(dispatcherJob.isJobManagerCreatedOrFailed(), is(false));
         assertThat(dispatcherJob.getResultFuture().isDone(), is(false));
         assertJobStatus(dispatcherJob, JobStatus.INITIALIZING);
     }
@@ -72,7 +72,7 @@ public class DispatcherJobTest extends TestLogger {
         // result future not done
         assertThat(dispatcherJob.getResultFuture().isDone(), is(false));
 
-        assertThat(dispatcherJob.isJobManagerCreated(), is(true));
+        assertThat(dispatcherJob.isJobManagerCreatedOrFailed(), is(true));
     }
 
     @Test
@@ -103,18 +103,18 @@ public class DispatcherJobTest extends TestLogger {
         CompletableFuture<Acknowledge> cancelFuture = dispatcherJob.cancel(TIMEOUT);
 
         assertThat(cancelFuture.isDone(), is(false));
-        assertThat(dispatcherJob.isJobManagerCreated(), is(false));
+        assertThat(dispatcherJob.isJobManagerCreatedOrFailed(), is(false));
 
         assertJobStatus(dispatcherJob, JobStatus.CANCELLING);
 
         testContext.setRunning();
-        testContext.finishCancellation();
+        testContext.completePendingCancellation();
 
         // assert that cancel future completes
         cancelFuture.get();
 
         assertJobStatus(dispatcherJob, JobStatus.CANCELED);
-        assertThat(dispatcherJob.isJobManagerCreated(), is(true));
+        assertThat(dispatcherJob.isJobManagerCreatedOrFailed(), is(true));
         // assert that the result future completes
         assertThat(
                 dispatcherJob
@@ -135,7 +135,7 @@ public class DispatcherJobTest extends TestLogger {
         CompletableFuture<Acknowledge> cancelFuture = dispatcherJob.cancel(TIMEOUT);
 
         assertJobStatus(dispatcherJob, JobStatus.CANCELLING);
-        testContext.finishCancellation();
+        testContext.completePendingCancellation();
 
         cancelFuture.get();
         assertJobStatus(dispatcherJob, JobStatus.CANCELED);
@@ -178,7 +178,7 @@ public class DispatcherJobTest extends TestLogger {
                 new RuntimeException("Artificial failure in runner initialization");
         testContext.failInitialization(exception);
 
-        assertThat(dispatcherJob.isJobManagerCreated(), is(false));
+        assertThat(dispatcherJob.isJobManagerCreatedOrFailed(), is(true));
         assertJobStatus(dispatcherJob, JobStatus.FAILED);
 
         ArchivedExecutionGraph aeg =
@@ -369,24 +369,15 @@ public class DispatcherJobTest extends TestLogger {
                                             getJobID(), "test", JobStatus.FINISHED, null, 1337))));
         }
 
-        public void finishCancellation() {
-            /* jobManagerRunnerCompletableFuture.thenAccept(
-            runner -> {
-                internalJobStatus = JobStatus.CANCELED;
-                runner.getResultFuture()
-                        .complete(
-                                JobManagerRunnerResult.forSuccess(
-                                        new ExecutionGraphInfo(
-                                                ArchivedExecutionGraph
-                                                        .createFromInitializingJob(
-                                                                getJobID(),
-                                                                "test",
-                                                                JobStatus.CANCELED,
-                                                                null,
-                                                                1337))));
-                cancellationFuture.complete(Acknowledge.get());
-            }); */
-            throw new UnsupportedOperationException();
+        public void completePendingCancellation() {
+            cancellationFuture.complete(Acknowledge.get());
+            internalJobStatus = JobStatus.CANCELED;
+
+            resultFuture.complete(
+                    JobManagerRunnerResult.forSuccess(
+                            new ExecutionGraphInfo(
+                                    ArchivedExecutionGraph.createFromInitializingJob(
+                                            getJobID(), "test", JobStatus.CANCELED, null, 1337))));
         }
     }
 

@@ -41,17 +41,16 @@ public class JobMasterITCase extends TestLogger {
     private static final String FAILURE_MESSAGE = "Intentional Test failure";
 
     /**
-     * This test is to guard against FLINK-22001, where any exception from the JobManager
-     * initialization was not forwarded to the user.
+     * This test is to guard against the issue reported in FLINK-22001, where any exception from the
+     * JobManager initialization was not forwarded to the user.
      */
     @Test
-    public void testJobManagerInitializationExceptionsAreForwardedToTheUser()
-            throws InterruptedException {
+    public void testJobManagerInitializationExceptionsAreForwardedToTheUser() {
         // we must use the LocalStreamEnvironment to reproduce this issue.
         // It passes with the TestStreamEnvironment (which is initialized by the
         // MiniClusterResource). The LocalStreamEnvironment is polling the JobManager for the job
         // status, while TestStreamEnvironment is waiting on the resultFuture.
-        StreamExecutionEnvironment see = StreamExecutionEnvironment.getExecutionEnvironment();
+        StreamExecutionEnvironment see = StreamExecutionEnvironment.createLocalEnvironment();
 
         Source<String, MockSplit, Void> mySource = new FailOnInitializationSource();
         DataStream<String> stream =

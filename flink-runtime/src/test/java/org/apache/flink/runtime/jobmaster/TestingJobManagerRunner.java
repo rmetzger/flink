@@ -24,6 +24,7 @@ import org.apache.flink.runtime.scheduler.ExecutionGraphInfo;
 import org.apache.flink.util.Preconditions;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.function.BiConsumer;
 
 /** Testing implementation of the {@link JobManagerRunner}. */
 public class TestingJobManagerRunner implements JobManagerRunner {
@@ -40,20 +41,28 @@ public class TestingJobManagerRunner implements JobManagerRunner {
 
     private final OneShotLatch closeAsyncCalledLatch = new OneShotLatch();
 
+    private final JobManagerStatusListener jobManagerStatusListener;
+    private final BiConsumer<JobManagerStatusListener, JobManagerRunner> onStartConsumer;
+
     private TestingJobManagerRunner(
             JobID jobId,
             boolean blockingTermination,
             CompletableFuture<JobMasterGateway> jobMasterGatewayFuture,
-            CompletableFuture<JobManagerRunnerResult> resultFuture) {
+            CompletableFuture<JobManagerRunnerResult> resultFuture,
+            JobManagerStatusListener jobManagerStatusListener,
+            BiConsumer<JobManagerStatusListener, JobManagerRunner> onStartConsumer) {
         this.jobId = jobId;
         this.blockingTermination = blockingTermination;
         this.jobMasterGatewayFuture = jobMasterGatewayFuture;
         this.resultFuture = resultFuture;
         this.terminationFuture = new CompletableFuture<>();
+        this.onStartConsumer = onStartConsumer;
 
         terminationFuture.whenComplete(
                 (ignored, ignoredThrowable) ->
                         resultFuture.completeExceptionally(new JobNotFinishedException(jobId)));
+
+        this.jobManagerStatusListener = jobManagerStatusListener;
     }
 
     @Override
@@ -72,10 +81,6 @@ public class TestingJobManagerRunner implements JobManagerRunner {
     @Override
     public JobID getJobID() {
         return jobId;
-    }
-
-    public CompletableFuture<JobMasterGateway> getJobMasterGatewayFuture() {
-        throw new UnsupportedOperationException();
     }
 
     @Override
@@ -116,6 +121,10 @@ public class TestingJobManagerRunner implements JobManagerRunner {
         this.jobMasterGatewayFuture.complete(testingJobMasterGateway);
     }
 
+    public void failInitialization(Throwable failure) {
+        jobManagerStatusListener.onJobManagerInitializationFailed(failure);
+    }
+
     /** {@code Builder} for instantiating {@link TestingJobManagerRunner} instances. */
     public static class Builder {
         private JobID jobId = null;
@@ -123,6 +132,10 @@ public class TestingJobManagerRunner implements JobManagerRunner {
         private CompletableFuture<JobMasterGateway> jobMasterGatewayFuture =
                 new CompletableFuture<>();
         private CompletableFuture<JobManagerRunnerResult> resultFuture = new CompletableFuture<>();
+        private JobManagerStatusListener jobManagerStatusListener =
+                new TestingJobManagerStatusListener();
+        private BiConsumer<JobManagerStatusListener, JobManagerRunner> onStartConsumer =
+                JobManagerStatusListener::onJobManagerStarted;
 
         public Builder setJobId(JobID jobId) {
             this.jobId = jobId;
@@ -131,6 +144,17 @@ public class TestingJobManagerRunner implements JobManagerRunner {
 
         public Builder setBlockingTermination(boolean blockingTermination) {
             this.blockingTermination = blockingTermination;
+            return this;
+        }
+
+        public Builder setJobManagerStatusListener(JobManagerStatusListener listener) {
+            this.jobManagerStatusListener = listener;
+            return this;
+        }
+
+        public Builder setOnStartConsumer(
+                BiConsumer<JobManagerStatusListener, JobManagerRunner> consumer) {
+            this.onStartConsumer = consumer;
             return this;
         }
 
@@ -150,7 +174,29 @@ public class TestingJobManagerRunner implements JobManagerRunner {
         public TestingJobManagerRunner build() {
             Preconditions.checkNotNull(jobId);
             return new TestingJobManagerRunner(
-                    jobId, blockingTermination, jobMasterGatewayFuture, resultFuture);
+                    jobId,
+                    blockingTermination,
+                    jobMasterGatewayFuture,
+                    resultFuture,
+                    jobManagerStatusListener,
+                    onStartConsumer);
+        }
+    }
+
+    private static class TestingJobManagerStatusListener implements JobManagerStatusListener {
+        @Override
+        public void onJobManagerStarted(JobManagerRunner jobManagerRunner) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void onJobManagerStopped() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void onJobManagerInitializationFailed(Throwable initializationFailure) {
+            throw new RuntimeException("Implement me", initializationFailure);
         }
     }
 }
