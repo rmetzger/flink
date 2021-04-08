@@ -18,10 +18,28 @@
 
 package org.apache.flink.runtime.jobmaster;
 
+import org.apache.flink.runtime.dispatcher.Dispatcher;
+import org.apache.flink.runtime.dispatcher.DispatcherJob;
+
+/**
+ * Listener for tracking the lifecycle of the JobManager by the {@link Dispatcher} (more
+ * specifically by the {@link DispatcherJob}.
+ */
 public interface JobManagerStatusListener {
+    /**
+     * Notification that the JobManager has been successfully started.
+     *
+     * @param jobManagerRunner Instance of the JobManagerRunner that has been started.
+     */
     void onJobManagerStarted(JobManagerRunner jobManagerRunner);
 
+    /** Notification that the JobManager has been stopped. */
     void onJobManagerStopped();
 
+    /**
+     * Notification that the JobManager initialization has failed.
+     *
+     * @param initializationFailure Initialization failure cause.
+     */
     void onJobManagerInitializationFailed(Throwable initializationFailure);
 }

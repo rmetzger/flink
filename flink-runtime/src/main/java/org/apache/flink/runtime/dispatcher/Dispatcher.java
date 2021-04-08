@@ -574,7 +574,7 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
     @Override
     public CompletableFuture<JobStatus> requestJobStatus(JobID jobId, Time timeout) {
         Optional<DispatcherJob> maybeJob = getDispatcherJob(jobId);
-        log.info("requestJobStatus.maybeJob = " + maybeJob);
+
         return maybeJob.map(job -> job.requestJobStatus(timeout))
                 .orElseGet(
                         () -> {

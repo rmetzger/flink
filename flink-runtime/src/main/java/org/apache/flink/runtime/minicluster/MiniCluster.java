@@ -700,7 +700,6 @@ public class MiniCluster implements AutoCloseableAsync {
     }
 
     public CompletableFuture<JobStatus> getJobStatus(JobID jobId) {
-        LOG.info("getJobStatus");
         return runDispatcherCommand(
                 dispatcherGateway -> dispatcherGateway.requestJobStatus(jobId, rpcTimeout));
     }
@@ -748,9 +747,9 @@ public class MiniCluster implements AutoCloseableAsync {
 
     private <T> CompletableFuture<T> runDispatcherCommand(
             Function<DispatcherGateway, CompletableFuture<T>> dispatcherCommand) {
-        CompletableFuture<DispatcherGateway> future = getDispatcherGatewayFuture();
-        LOG.info("future = " + future);
-        return future.thenApply(dispatcherCommand).thenCompose(Function.identity());
+        return getDispatcherGatewayFuture()
+                .thenApply(dispatcherCommand)
+                .thenCompose(Function.identity());
     }
 
     // ------------------------------------------------------------------------

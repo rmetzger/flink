@@ -141,51 +141,23 @@ public enum ClientUtils {
             long attempt = 0;
             while (status == JobStatus.INITIALIZING) {
                 Thread.sleep(waitStrategy.sleepTime(attempt++));
-                // If the jobStatusSupplier throws an exception while initializing, catch it and see
-                // if we can retrieve the job result with the failure cause.
-                try {
-                    status = jobStatusSupplier.get();
-                } catch (Throwable supplierThrowable) {
-                    LOG.info("status supplier failed", supplierThrowable);
-                    /*   final Optional<Throwable> failureCause =
-                                tryGettingFailureCause(jobResultSupplier, userCodeClassloader);
-                        if (failureCause.isPresent()) {
-                            final Throwable failure = failureCause.get();
-                            failure.addSuppressed(supplierThrowable);
-                            throw failure;
-                        }
-                    } */
-                    throw supplierThrowable;
-                }
+                status = jobStatusSupplier.get();
             }
             if (status == JobStatus.FAILED) {
-                final Optional<Throwable> failureCause =
-                        tryGettingFailureCause(jobResultSupplier, userCodeClassloader);
-                if (failureCause.isPresent()) {
-                    throw failureCause.get();
+                JobResult result = jobResultSupplier.get();
+                Optional<SerializedThrowable> throwable = result.getSerializedThrowable();
+                if (throwable.isPresent()) {
+                    Throwable t = throwable.get().deserializeError(userCodeClassloader);
+                    if (t instanceof JobInitializationException) {
+                        throw t;
+                    }
                 }
             }
-
         } catch (JobInitializationException initializationException) {
             throw initializationException;
         } catch (Throwable throwable) {
             ExceptionUtils.checkInterrupted(throwable);
             throw new RuntimeException("Error while waiting for job to be initialized", throwable);
         }
-    }
-
-    private static Optional<Throwable> tryGettingFailureCause(
-            SupplierWithException<JobResult, Exception> jobResultSupplier,
-            ClassLoader userCodeClassloader)
-            throws Throwable {
-        JobResult result = jobResultSupplier.get();
-        Optional<SerializedThrowable> throwable = result.getSerializedThrowable();
-        if (throwable.isPresent()) {
-            Throwable t = throwable.get().deserializeError(userCodeClassloader);
-            if (t instanceof JobInitializationException) {
-                return Optional.of(t);
-            }
-        }
-        return Optional.empty();
     }
 }

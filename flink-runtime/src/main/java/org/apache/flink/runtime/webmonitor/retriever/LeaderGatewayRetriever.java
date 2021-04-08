@@ -48,10 +48,8 @@ public abstract class LeaderGatewayRetriever<T extends RpcGateway> extends Leade
     @Override
     public CompletableFuture<T> getFuture() {
         final CompletableFuture<T> currentGatewayFuture = atomicGatewayFuture.get();
-        log.info("currentGatewayFuture = " + currentGatewayFuture);
 
         if (currentGatewayFuture.isCompletedExceptionally()) {
-            log.info("is completed exceptionally");
             try {
                 currentGatewayFuture.get();
             } catch (ExecutionException | InterruptedException executionException) {
@@ -94,7 +92,6 @@ public abstract class LeaderGatewayRetriever<T extends RpcGateway> extends Leade
                 return atomicGatewayFuture.get();
             }
         } else {
-            log.info("waiting on future");
             return atomicGatewayFuture.get();
         }
     }

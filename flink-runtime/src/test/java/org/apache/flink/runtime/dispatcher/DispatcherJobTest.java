@@ -48,13 +48,13 @@ import static org.junit.Assert.assertThat;
 public class DispatcherJobTest extends TestLogger {
 
     private static final Time TIMEOUT = Time.seconds(10L);
-    /*
+
     @Test
     public void testStatusWhenInitializing() throws Exception {
         TestContext testContext = createTestContext();
         DispatcherJob dispatcherJob = testContext.getDispatcherJob();
 
-        assertThat(dispatcherJob.isInitialized(), is(false));
+        assertThat(dispatcherJob.isJobManagerCreated(), is(false));
         assertThat(dispatcherJob.getResultFuture().isDone(), is(false));
         assertJobStatus(dispatcherJob, JobStatus.INITIALIZING);
     }
@@ -72,8 +72,8 @@ public class DispatcherJobTest extends TestLogger {
         // result future not done
         assertThat(dispatcherJob.getResultFuture().isDone(), is(false));
 
-        assertThat(dispatcherJob.isInitialized(), is(true));
-    }*/
+        assertThat(dispatcherJob.isJobManagerCreated(), is(true));
+    }
 
     @Test
     public void testStatusWhenJobFinished() throws Exception {
@@ -94,7 +94,7 @@ public class DispatcherJobTest extends TestLogger {
                 is(JobStatus.FINISHED));
     }
 
-    /*    @Test
+    @Test
     public void testStatusWhenCancellingWhileInitializing() throws Exception {
         TestContext testContext = createTestContext();
         DispatcherJob dispatcherJob = testContext.getDispatcherJob();
@@ -103,7 +103,7 @@ public class DispatcherJobTest extends TestLogger {
         CompletableFuture<Acknowledge> cancelFuture = dispatcherJob.cancel(TIMEOUT);
 
         assertThat(cancelFuture.isDone(), is(false));
-        assertThat(dispatcherJob.isInitialized(), is(false));
+        assertThat(dispatcherJob.isJobManagerCreated(), is(false));
 
         assertJobStatus(dispatcherJob, JobStatus.CANCELLING);
 
@@ -114,7 +114,7 @@ public class DispatcherJobTest extends TestLogger {
         cancelFuture.get();
 
         assertJobStatus(dispatcherJob, JobStatus.CANCELED);
-        assertThat(dispatcherJob.isInitialized(), is(true));
+        assertThat(dispatcherJob.isJobManagerCreated(), is(true));
         // assert that the result future completes
         assertThat(
                 dispatcherJob
@@ -124,7 +124,7 @@ public class DispatcherJobTest extends TestLogger {
                         .getArchivedExecutionGraph()
                         .getState(),
                 is(JobStatus.CANCELED));
-    } */
+    }
 
     @Test
     public void testStatusWhenCancellingWhileRunning() throws Exception {
@@ -168,7 +168,7 @@ public class DispatcherJobTest extends TestLogger {
         assertJobStatus(dispatcherJob, JobStatus.FAILED);
     }
 
-    /*  @Test
+    @Test
     public void testErrorWhileInitializing() throws Exception {
         TestContext testContext = createTestContext();
         DispatcherJob dispatcherJob = testContext.getDispatcherJob();
@@ -178,7 +178,7 @@ public class DispatcherJobTest extends TestLogger {
                 new RuntimeException("Artificial failure in runner initialization");
         testContext.failInitialization(exception);
 
-        assertThat(dispatcherJob.isInitialized(), is(true));
+        assertThat(dispatcherJob.isJobManagerCreated(), is(false));
         assertJobStatus(dispatcherJob, JobStatus.FAILED);
 
         ArchivedExecutionGraph aeg =
@@ -192,7 +192,7 @@ public class DispatcherJobTest extends TestLogger {
                         .getException()
                         .deserializeError(ClassLoader.getSystemClassLoader()),
                 is(exception));
-    } */
+    }
 
     @Test
     public void testDispatcherJobResult() throws Exception {
@@ -276,18 +276,14 @@ public class DispatcherJobTest extends TestLogger {
 
     private TestContext createTestContext() {
         JobGraph jobGraph = JobGraphTestUtils.singleNoOpJobGraph();
-        CompletableFuture<JobManagerRunner> jobManagerRunnerCompletableFuture =
-                new CompletableFuture<>();
         DispatcherJob dispatcherJob =
                 DispatcherJob.createFor(
-                        // jobManagerRunnerCompletableFuture,
                         jobGraph.getJobID(), jobGraph.getName(), System.currentTimeMillis());
 
-        return new TestContext(jobManagerRunnerCompletableFuture, dispatcherJob, jobGraph);
+        return new TestContext(dispatcherJob, jobGraph);
     }
 
     private static class TestContext {
-        private final CompletableFuture<JobManagerRunner> jobManagerRunnerCompletableFuture;
         private final DispatcherJob dispatcherJob;
         private final JobGraph jobGraph;
         private final TestingJobMasterGateway mockRunningJobMasterGateway;
@@ -296,11 +292,7 @@ public class DispatcherJobTest extends TestLogger {
         private JobStatus internalJobStatus = JobStatus.INITIALIZING;
         private CompletableFuture<JobManagerRunnerResult> resultFuture = new CompletableFuture<>();
 
-        public TestContext(
-                CompletableFuture<JobManagerRunner> jobManagerRunnerCompletableFuture,
-                DispatcherJob dispatcherJob,
-                JobGraph jobGraph) {
-            this.jobManagerRunnerCompletableFuture = jobManagerRunnerCompletableFuture;
+        public TestContext(DispatcherJob dispatcherJob, JobGraph jobGraph) {
             this.dispatcherJob = dispatcherJob;
             this.jobGraph = jobGraph;
 
@@ -347,8 +339,8 @@ public class DispatcherJobTest extends TestLogger {
             return jobGraph.getJobID();
         }
 
-        public void failInitialization(Throwable ex) {
-            jobManagerRunnerCompletableFuture.completeExceptionally(ex);
+        public void failInitialization(Throwable failureCause) {
+            dispatcherJob.onJobManagerInitializationFailed(failureCause);
         }
 
         public DispatcherJob getDispatcherJob() {
@@ -365,7 +357,7 @@ public class DispatcherJobTest extends TestLogger {
                                     CompletableFuture.completedFuture(mockRunningJobMasterGateway))
                             .setResultFuture(resultFuture)
                             .build();
-            jobManagerRunnerCompletableFuture.complete(jobManagerRunner);
+            dispatcherJob.onJobManagerStarted(jobManagerRunner);
         }
 
         public void finishJob() {
@@ -378,22 +370,23 @@ public class DispatcherJobTest extends TestLogger {
         }
 
         public void finishCancellation() {
-            jobManagerRunnerCompletableFuture.thenAccept(
-                    runner -> {
-                        internalJobStatus = JobStatus.CANCELED;
-                        runner.getResultFuture()
-                                .complete(
-                                        JobManagerRunnerResult.forSuccess(
-                                                new ExecutionGraphInfo(
-                                                        ArchivedExecutionGraph
-                                                                .createFromInitializingJob(
-                                                                        getJobID(),
-                                                                        "test",
-                                                                        JobStatus.CANCELED,
-                                                                        null,
-                                                                        1337))));
-                        cancellationFuture.complete(Acknowledge.get());
-                    });
+            /* jobManagerRunnerCompletableFuture.thenAccept(
+            runner -> {
+                internalJobStatus = JobStatus.CANCELED;
+                runner.getResultFuture()
+                        .complete(
+                                JobManagerRunnerResult.forSuccess(
+                                        new ExecutionGraphInfo(
+                                                ArchivedExecutionGraph
+                                                        .createFromInitializingJob(
+                                                                getJobID(),
+                                                                "test",
+                                                                JobStatus.CANCELED,
+                                                                null,
+                                                                1337))));
+                cancellationFuture.complete(Acknowledge.get());
+            }); */
+            throw new UnsupportedOperationException();
         }
     }
 

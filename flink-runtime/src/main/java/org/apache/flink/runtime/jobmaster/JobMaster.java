@@ -788,7 +788,6 @@ public class JobMaster extends PermanentlyFencedRpcEndpoint<JobMasterId>
 
     @Override
     public CompletableFuture<ExecutionGraphInfo> requestJob(Time timeout) {
-        log.info("JobMaster.requestJob");
         return CompletableFuture.completedFuture(schedulerNG.requestJob());
     }
 
