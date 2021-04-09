@@ -61,7 +61,7 @@ public class DispatcherJobStatus {
     public void setInitializing() {
         Preconditions.checkState(
                 status == Status.JOB_MANAGER_CREATED_OR_INIT_FAILED || status == Status.CANCELLING,
-                "JobManager must be in state created or cancelling to be stopped");
+                "JobManager must be in state created or cancelling to go back to initializing");
         jobManagerRunnerFuture.completeExceptionally(
                 new FlinkException("Initializing new JobManager."));
         jobManagerRunnerFuture = new CompletableFuture<>();

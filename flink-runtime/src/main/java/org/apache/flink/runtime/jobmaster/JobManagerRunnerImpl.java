@@ -226,8 +226,6 @@ public class JobManagerRunnerImpl
                                     resultFuture.complete(
                                             JobManagerRunnerResult.forJobNotFinished());
 
-                                    jobManagerStatusListener.onJobManagerStopped();
-
                                     if (throwable != null) {
                                         terminationFuture.completeExceptionally(
                                                 new FlinkException(
@@ -381,20 +379,25 @@ public class JobManagerRunnerImpl
 
             jobMasterService = newJobMasterService;
 
-            jobMasterService
-                    .getTerminationFuture()
-                    .whenComplete(
-                            (unused, throwable) -> {
-                                if (throwable != null) {
-                                    synchronized (lock) {
-                                        // check that we are still running and the JobMasterService
-                                        // is still valid
-                                        if (!shutdown && newJobMasterService == jobMasterService) {
-                                            handleJobManagerRunnerError(throwable);
+            FutureUtils.assertNoException(
+                    jobMasterService
+                            .getTerminationFuture()
+                            .whenComplete(
+                                    (unused, throwable) -> {
+                                        jobManagerStatusListener.onJobManagerStopped();
+                                        if (throwable != null) {
+                                            synchronized (lock) {
+                                                // check that we are still running and the
+                                                // JobMasterService
+                                                // is still valid
+                                                if (!shutdown
+                                                        && newJobMasterService
+                                                                == jobMasterService) {
+                                                    handleJobManagerRunnerError(throwable);
+                                                }
+                                            }
                                         }
-                                    }
-                                }
-                            });
+                                    }));
         } catch (Exception initializationException) {
             jobManagerStatusListener.onJobManagerInitializationFailed(initializationException);
         }

@@ -118,10 +118,6 @@ public final class DispatcherJob implements AutoCloseableAsync, JobManagerStatus
                 // This DispatcherJob is terminated
                 return;
             }
-            Preconditions.checkState(
-                    jobResultFuture.isDone(),
-                    "Expecting job result to be complete when JobManager has been stopped");
-            jobResultFuture = new CompletableFuture<>();
             jobStatus.setInitializing();
         }
     }
