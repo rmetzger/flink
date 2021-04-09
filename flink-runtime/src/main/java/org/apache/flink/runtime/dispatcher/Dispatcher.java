@@ -393,29 +393,31 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
     }
 
     private void runJob(JobGraph jobGraph, ExecutionType executionType) throws Exception {
-        Preconditions.checkState(!runningJobs.containsKey(jobGraph.getJobID()));
+        final JobID jobId = jobGraph.getJobID();
+        Preconditions.checkState(!runningJobs.containsKey(jobId));
         long initializationTimestamp = System.currentTimeMillis();
 
         DispatcherJob dispatcherJob =
-                DispatcherJob.createFor(
-                        jobGraph.getJobID(), jobGraph.getName(), initializationTimestamp);
-        runningJobs.put(jobGraph.getJobID(), dispatcherJob);
+                DispatcherJob.createFor(jobId, jobGraph.getName(), initializationTimestamp);
+        runningJobs.put(jobId, dispatcherJob);
 
-        JobManagerRunner runner =
-                jobManagerRunnerFactory.createJobManagerRunner(
-                        jobGraph,
-                        configuration,
-                        getRpcService(),
-                        highAvailabilityServices,
-                        heartbeatServices,
-                        jobManagerSharedServices,
-                        new DefaultJobManagerJobMetricGroupFactory(jobManagerMetricGroup),
-                        fatalErrorHandler,
-                        initializationTimestamp,
-                        dispatcherJob);
-        runner.start();
-
-        final JobID jobId = jobGraph.getJobID();
+        try {
+            JobManagerRunner runner =
+                    jobManagerRunnerFactory.createJobManagerRunner(
+                            jobGraph,
+                            configuration,
+                            getRpcService(),
+                            highAvailabilityServices,
+                            heartbeatServices,
+                            jobManagerSharedServices,
+                            new DefaultJobManagerJobMetricGroupFactory(jobManagerMetricGroup),
+                            fatalErrorHandler,
+                            initializationTimestamp,
+                            dispatcherJob);
+            runner.start();
+        } catch (Exception jobManagerRunnerException) {
+            dispatcherJob.onJobManagerInitializationFailed(jobManagerRunnerException);
+        }
 
         final CompletableFuture<CleanupJobState> cleanupJobStateFuture =
                 dispatcherJob

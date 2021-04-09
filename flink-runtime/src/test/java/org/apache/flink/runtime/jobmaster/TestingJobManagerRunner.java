@@ -24,7 +24,6 @@ import org.apache.flink.runtime.scheduler.ExecutionGraphInfo;
 import org.apache.flink.util.Preconditions;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.function.BiConsumer;
 
 /** Testing implementation of the {@link JobManagerRunner}. */
 public class TestingJobManagerRunner implements JobManagerRunner {
@@ -42,21 +41,18 @@ public class TestingJobManagerRunner implements JobManagerRunner {
     private final OneShotLatch closeAsyncCalledLatch = new OneShotLatch();
 
     private final JobManagerStatusListener jobManagerStatusListener;
-    private final BiConsumer<JobManagerStatusListener, JobManagerRunner> onStartConsumer;
 
     private TestingJobManagerRunner(
             JobID jobId,
             boolean blockingTermination,
             CompletableFuture<JobMasterGateway> jobMasterGatewayFuture,
             CompletableFuture<JobManagerRunnerResult> resultFuture,
-            JobManagerStatusListener jobManagerStatusListener,
-            BiConsumer<JobManagerStatusListener, JobManagerRunner> onStartConsumer) {
+            JobManagerStatusListener jobManagerStatusListener) {
         this.jobId = jobId;
         this.blockingTermination = blockingTermination;
         this.jobMasterGatewayFuture = jobMasterGatewayFuture;
         this.resultFuture = resultFuture;
         this.terminationFuture = new CompletableFuture<>();
-        this.onStartConsumer = onStartConsumer;
 
         terminationFuture.whenComplete(
                 (ignored, ignoredThrowable) ->
@@ -134,8 +130,6 @@ public class TestingJobManagerRunner implements JobManagerRunner {
         private CompletableFuture<JobManagerRunnerResult> resultFuture = new CompletableFuture<>();
         private JobManagerStatusListener jobManagerStatusListener =
                 new TestingJobManagerStatusListener();
-        private BiConsumer<JobManagerStatusListener, JobManagerRunner> onStartConsumer =
-                JobManagerStatusListener::onJobManagerStarted;
 
         public Builder setJobId(JobID jobId) {
             this.jobId = jobId;
@@ -149,12 +143,6 @@ public class TestingJobManagerRunner implements JobManagerRunner {
 
         public Builder setJobManagerStatusListener(JobManagerStatusListener listener) {
             this.jobManagerStatusListener = listener;
-            return this;
-        }
-
-        public Builder setOnStartConsumer(
-                BiConsumer<JobManagerStatusListener, JobManagerRunner> consumer) {
-            this.onStartConsumer = consumer;
             return this;
         }
 
@@ -178,8 +166,7 @@ public class TestingJobManagerRunner implements JobManagerRunner {
                     blockingTermination,
                     jobMasterGatewayFuture,
                     resultFuture,
-                    jobManagerStatusListener,
-                    onStartConsumer);
+                    jobManagerStatusListener);
         }
     }
 

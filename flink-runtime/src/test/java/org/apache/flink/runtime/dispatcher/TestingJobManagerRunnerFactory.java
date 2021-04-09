@@ -28,6 +28,7 @@ import org.apache.flink.runtime.jobmaster.TestingJobManagerRunner;
 import org.apache.flink.runtime.jobmaster.factories.JobManagerJobMetricGroupFactory;
 import org.apache.flink.runtime.rpc.FatalErrorHandler;
 import org.apache.flink.runtime.rpc.RpcService;
+import org.apache.flink.util.Preconditions;
 
 import javax.annotation.Nonnull;
 
@@ -39,6 +40,9 @@ import java.util.concurrent.BlockingQueue;
  * TestingJobManagerRunner}.
  */
 public class TestingJobManagerRunnerFactory implements JobManagerRunnerFactory {
+
+    protected TestingJobManagerRunner testingRunner;
+    protected JobManagerStatusListener jobManagerStatusListener;
 
     private final BlockingQueue<TestingJobManagerRunner> createdJobManagerRunner =
             new ArrayBlockingQueue<>(16);
@@ -66,15 +70,16 @@ public class TestingJobManagerRunnerFactory implements JobManagerRunnerFactory {
             long initializationTimestamp,
             JobManagerStatusListener jobManagerStatusListener)
             throws Exception {
-        final TestingJobManagerRunner testingJobManagerRunner =
-                createTestingJobManagerRunner(jobGraph);
-        createdJobManagerRunner.offer(testingJobManagerRunner);
+        this.jobManagerStatusListener = jobManagerStatusListener;
+        testingRunner = createTestingJobManagerRunner(jobGraph, jobManagerStatusListener);
+        createdJobManagerRunner.offer(testingRunner);
 
-        return testingJobManagerRunner;
+        return testingRunner;
     }
 
     @Nonnull
-    private TestingJobManagerRunner createTestingJobManagerRunner(JobGraph jobGraph) {
+    private TestingJobManagerRunner createTestingJobManagerRunner(
+            JobGraph jobGraph, JobManagerStatusListener jobManagerStatusListener) {
         final boolean blockingTermination;
 
         if (numBlockingJobManagerRunners > 0) {
@@ -87,10 +92,18 @@ public class TestingJobManagerRunnerFactory implements JobManagerRunnerFactory {
         return new TestingJobManagerRunner.Builder()
                 .setJobId(jobGraph.getJobID())
                 .setBlockingTermination(blockingTermination)
+                .setJobManagerStatusListener(jobManagerStatusListener)
                 .build();
     }
 
     public TestingJobManagerRunner takeCreatedJobManagerRunner() throws InterruptedException {
         return createdJobManagerRunner.take();
+    }
+
+    public void completeJobManagerRunnerInitialization() {
+        Preconditions.checkNotNull(
+                jobManagerStatusListener, "JobManagerRunner has not been created");
+        Preconditions.checkNotNull(testingRunner, "JobManagerRunner has not been created");
+        jobManagerStatusListener.onJobManagerStarted(testingRunner);
     }
 }
