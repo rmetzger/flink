@@ -50,8 +50,8 @@ public final class DispatcherJob implements AutoCloseableAsync, JobManagerStatus
 
     private CompletableFuture<DispatcherJobResult> jobResultFuture;
 
-    // if the termination future is set, we are signaling that this DispatcherJob is awaiting a
-    // termination.
+    // if the termination future is set, we are signaling that this DispatcherJob is closing / has
+    // been closed
     @GuardedBy("lock")
     @Nullable
     private CompletableFuture<Void> terminationFuture;
@@ -114,6 +114,10 @@ public final class DispatcherJob implements AutoCloseableAsync, JobManagerStatus
     @Override
     public void onJobManagerStopped() {
         synchronized (lock) {
+            if (terminationFuture != null) {
+                // This DispatcherJob is terminated
+                return;
+            }
             Preconditions.checkState(
                     jobResultFuture.isDone(),
                     "Expecting job result to be complete when JobManager has been stopped");
@@ -263,6 +267,9 @@ public final class DispatcherJob implements AutoCloseableAsync, JobManagerStatus
     @Override
     public CompletableFuture<Void> closeAsync() {
         synchronized (lock) {
+            if (terminationFuture == null) {
+                terminationFuture = new CompletableFuture<>();
+            }
             if (jobStatus.isJobManagerCreatedOrFailed()) {
                 final CompletableFuture<JobManagerRunner> jobManagerRunnerFuture =
                         jobStatus.getJobManagerRunnerFuture();
@@ -273,11 +280,7 @@ public final class DispatcherJob implements AutoCloseableAsync, JobManagerStatus
                     // JobManager is running: close it.
                     return jobManagerRunnerFuture.thenCompose(AutoCloseableAsync::closeAsync);
                 }
-
             } else {
-                Preconditions.checkState(terminationFuture == null);
-                // wait for initialization / cancellation to be finished
-                terminationFuture = new CompletableFuture<>();
                 return terminationFuture;
             }
         }

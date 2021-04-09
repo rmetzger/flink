@@ -266,57 +266,105 @@ public class JobManagerRunnerImplTest extends TestLogger {
                 FlinkMatchers.futureWillCompleteExceptionally(Duration.ofSeconds(10L)));
     }
 
-    /*   @Test
+    @Test
     public void testJobMasterCreationFailureCompletesJobManagerRunnerWithInitializationError()
             throws Exception {
 
         final FlinkException testException = new FlinkException("Test exception");
+        final TestingJobManagerStatusListener testingJobManagerStatusListener =
+                new TestingJobManagerStatusListener();
         final TestingJobMasterServiceFactory jobMasterServiceFactory =
                 new TestingJobMasterServiceFactory(
                         () -> {
                             throw testException;
                         });
 
-        final JobManagerRunner jobManagerRunner = createJobManagerRunner(jobMasterServiceFactory);
+        final JobManagerRunner jobManagerRunner =
+                createJobManagerRunner(jobMasterServiceFactory, testingJobManagerStatusListener);
 
         jobManagerRunner.start();
 
         leaderElectionService.isLeader(UUID.randomUUID());
 
-        final JobManagerRunnerResult jobManagerRunnerResult =
-                jobManagerRunner.getResultFuture().join();
-        assertTrue(jobManagerRunnerResult.isInitializationFailure());
-        assertTrue(
-                jobManagerRunnerResult.getInitializationFailure()
-                        instanceof JobInitializationException);
         assertThat(
-                jobManagerRunnerResult.getInitializationFailure(),
-                FlinkMatchers.containsCause(testException));
-    } */
-
-    @Nonnull
-    private JobManagerRunner createJobManagerRunner(
-            LibraryCacheManager.ClassLoaderLease classLoaderLease) throws Exception {
-        return createJobManagerRunner(defaultJobMasterServiceFactory, classLoaderLease);
+                testingJobManagerStatusListener.getInitializationFailure().get(),
+                is(testException));
     }
 
-    @Nonnull
-    private JobManagerRunnerImpl createJobManagerRunner() throws Exception {
-        return createJobManagerRunner(
-                defaultJobMasterServiceFactory, TestingClassLoaderLease.newBuilder().build());
+    @Test
+    public void testJobManagerStatusListenerCompletion() throws Exception {
+        TestingJobManagerStatusListener testingJobManagerStatusListener =
+                new TestingJobManagerStatusListener();
+        final JobManagerRunnerImpl jobManagerRunner =
+                createJobManagerRunner(testingJobManagerStatusListener);
+
+        try {
+            jobManagerRunner.start();
+            leaderElectionService.isLeader(UUID.randomUUID());
+
+            assertThat(
+                    testingJobManagerStatusListener.getJobManagerStarted().get(),
+                    is(jobManagerRunner));
+
+            jobManagerRunner.jobReachedGloballyTerminalState(executionGraphInfo);
+        } finally {
+            jobManagerRunner.close();
+        }
+        // assert stop call
+        testingJobManagerStatusListener.getJobManagerStopped().get();
     }
 
     @Nonnull
     private JobManagerRunner createJobManagerRunner(JobMasterServiceFactory jobMasterServiceFactory)
             throws Exception {
         return createJobManagerRunner(
-                jobMasterServiceFactory, TestingClassLoaderLease.newBuilder().build());
+                jobMasterServiceFactory,
+                TestingClassLoaderLease.newBuilder().build(),
+                new TestingJobManagerStatusListener());
+    }
+
+    @Nonnull
+    private JobManagerRunner createJobManagerRunner(
+            LibraryCacheManager.ClassLoaderLease classLoaderLease) throws Exception {
+        return createJobManagerRunner(
+                defaultJobMasterServiceFactory,
+                classLoaderLease,
+                new TestingJobManagerStatusListener());
+    }
+
+    @Nonnull
+    private JobManagerRunnerImpl createJobManagerRunner(
+            JobManagerStatusListener jobManagerStatusListener) throws Exception {
+        return createJobManagerRunner(
+                defaultJobMasterServiceFactory,
+                TestingClassLoaderLease.newBuilder().build(),
+                jobManagerStatusListener);
+    }
+
+    @Nonnull
+    private JobManagerRunnerImpl createJobManagerRunner() throws Exception {
+        return createJobManagerRunner(
+                defaultJobMasterServiceFactory,
+                TestingClassLoaderLease.newBuilder().build(),
+                new TestingJobManagerStatusListener());
+    }
+
+    @Nonnull
+    private JobManagerRunner createJobManagerRunner(
+            JobMasterServiceFactory jobMasterServiceFactory,
+            JobManagerStatusListener jobManagerStatusListener)
+            throws Exception {
+        return createJobManagerRunner(
+                jobMasterServiceFactory,
+                TestingClassLoaderLease.newBuilder().build(),
+                jobManagerStatusListener);
     }
 
     @Nonnull
     private JobManagerRunnerImpl createJobManagerRunner(
             JobMasterServiceFactory jobMasterServiceFactory,
-            LibraryCacheManager.ClassLoaderLease classLoaderLease)
+            LibraryCacheManager.ClassLoaderLease classLoaderLease,
+            JobManagerStatusListener jobManagerStatusListener)
             throws Exception {
         return new JobManagerRunnerImpl(
                 jobGraph,
@@ -326,6 +374,39 @@ public class JobManagerRunnerImplTest extends TestLogger {
                 TestingUtils.defaultExecutor(),
                 fatalErrorHandler,
                 System.currentTimeMillis(),
-                null); // TODO
+                jobManagerStatusListener);
+    }
+
+    private class TestingJobManagerStatusListener implements JobManagerStatusListener {
+        private CompletableFuture<Throwable> initializationFailure = new CompletableFuture<>();
+        private CompletableFuture<JobManagerRunner> jobManagerStarted = new CompletableFuture<>();
+        private CompletableFuture<Void> jobManagerStopped = new CompletableFuture<>();
+
+        @Override
+        public void onJobManagerStarted(JobManagerRunner jobManagerRunner) {
+            jobManagerStarted.complete(jobManagerRunner);
+        }
+
+        @Override
+        public void onJobManagerStopped() {
+            jobManagerStopped.complete(null);
+        }
+
+        @Override
+        public void onJobManagerInitializationFailed(Throwable initializationFailure) {
+            this.initializationFailure.complete(initializationFailure);
+        }
+
+        public CompletableFuture<Throwable> getInitializationFailure() {
+            return initializationFailure;
+        }
+
+        public CompletableFuture<JobManagerRunner> getJobManagerStarted() {
+            return jobManagerStarted;
+        }
+
+        public CompletableFuture<Void> getJobManagerStopped() {
+            return jobManagerStopped;
+        }
     }
 }

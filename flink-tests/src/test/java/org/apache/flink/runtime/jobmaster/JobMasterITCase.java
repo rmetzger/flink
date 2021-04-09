@@ -37,6 +37,7 @@ import org.junit.Test;
 import static org.apache.flink.core.testutils.FlinkMatchers.containsMessage;
 import static org.junit.Assert.assertThat;
 
+/** Integration tests for the {@link JobMaster}. */
 public class JobMasterITCase extends TestLogger {
     private static final String FAILURE_MESSAGE = "Intentional Test failure";
 

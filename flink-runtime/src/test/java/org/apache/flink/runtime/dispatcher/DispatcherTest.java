@@ -360,9 +360,11 @@ public class DispatcherTest extends TestLogger {
         dispatcherGateway.submitJob(jobGraph, TIMEOUT).get();
 
         jobMasterLeaderElectionService.getStartFuture().get();
+        log.info("got start future");
 
         // complete JobManager initialization by granting leadership
         jobMasterLeaderElectionService.isLeader(UUID.randomUUID()).get();
+        log.info("assigned leader");
     }
 
     /**
