@@ -44,6 +44,7 @@ import org.apache.flink.runtime.jobgraph.JobGraphBuilder;
 import org.apache.flink.runtime.jobgraph.JobGraphTestUtils;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobmanager.JobGraphWriter;
+import org.apache.flink.runtime.jobmaster.BlockingTestingJobManagerRunner;
 import org.apache.flink.runtime.jobmaster.JobManagerRunner;
 import org.apache.flink.runtime.jobmaster.JobManagerSharedServices;
 import org.apache.flink.runtime.jobmaster.JobManagerStatusListener;
@@ -117,6 +118,7 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import static org.apache.flink.core.testutils.FlinkMatchers.containsMessage;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.instanceOf;
@@ -360,11 +362,9 @@ public class DispatcherTest extends TestLogger {
         dispatcherGateway.submitJob(jobGraph, TIMEOUT).get();
 
         jobMasterLeaderElectionService.getStartFuture().get();
-        log.info("got start future");
 
         // complete JobManager initialization by granting leadership
         jobMasterLeaderElectionService.isLeader(UUID.randomUUID()).get();
-        log.info("assigned leader");
     }
 
     /**
@@ -518,8 +518,13 @@ public class DispatcherTest extends TestLogger {
 
     @Test
     public void testJobManagerRunnerInitializationFailureFailsJob() throws Exception {
+        final FlinkException testFailure = new FlinkException("Test failure");
+
         final TestingJobManagerRunnerFactory testingJobManagerRunnerFactory =
-                new TestingJobManagerRunnerFactory();
+                new FailingJobManagerRunnerFactory(
+                        () -> {
+                            throw testFailure;
+                        });
 
         dispatcher =
                 createAndStartDispatcher(
@@ -531,12 +536,6 @@ public class DispatcherTest extends TestLogger {
                 JobGraphBuilder.newStreamingJobGraphBuilder().setJobId(jobId).build();
 
         dispatcherGateway.submitJob(emptyJobGraph, TIMEOUT).get();
-
-        final TestingJobManagerRunner testingJobManagerRunner =
-                testingJobManagerRunnerFactory.takeCreatedJobManagerRunner();
-
-        final FlinkException testFailure = new FlinkException("Test failure");
-        testingJobManagerRunner.failInitialization(testFailure);
 
         // wait till job has failed
         dispatcherGateway.requestJobResult(jobId, TIMEOUT).get();
@@ -554,7 +553,7 @@ public class DispatcherTest extends TestLogger {
                         .deserializeError(ClassLoader.getSystemClassLoader());
 
         // ensure correct exception type
-        assertThat(throwable, is(testFailure));
+        assertThat(throwable, containsMessage(testFailure.getMessage()));
     }
 
     /** Test that {@link JobResult} is cached when the job finishes. */
@@ -677,7 +676,6 @@ public class DispatcherTest extends TestLogger {
                 dispatcher.getSelfGateway(DispatcherGateway.class);
 
         dispatcherGateway.submitJob(jobGraph, TIMEOUT).get();
-        testingJobManagerRunnerFactory.completeJobManagerRunnerInitialization();
         log.info("Job submission completed");
 
         CompletableFuture<JobStatus> jobStatusFuture =
@@ -717,8 +715,11 @@ public class DispatcherTest extends TestLogger {
         final FlinkException testException = new FlinkException("Test exception");
         jobMasterLeaderElectionService.isLeader(UUID.randomUUID());
 
-        final TestingJobManagerRunnerFactory jobManagerRunnerFactory =
-                new TestingJobManagerRunnerFactory();
+        final JobManagerRunnerFactory jobManagerRunnerFactory =
+                new FailingJobManagerRunnerFactory(
+                        () -> {
+                            throw testException;
+                        });
         dispatcher =
                 new TestingDispatcherBuilder()
                         .setJobManagerRunnerFactory(jobManagerRunnerFactory)
@@ -730,12 +731,6 @@ public class DispatcherTest extends TestLogger {
 
         final TestingFatalErrorHandler fatalErrorHandler =
                 testingFatalErrorHandlerResource.getFatalErrorHandler();
-
-        final TestingJobManagerRunner testingJobManagerRunner =
-                jobManagerRunnerFactory.takeCreatedJobManagerRunner();
-
-        // Let the initialization of the JobManagerRunner fail
-        testingJobManagerRunner.failInitialization(testException);
 
         final Throwable error =
                 fatalErrorHandler
@@ -794,8 +789,6 @@ public class DispatcherTest extends TestLogger {
         // submit job again
         dispatcherGateway.submitJob(jobGraph, TIMEOUT).get();
         jobMasterLeaderElectionService.isLeader(UUID.randomUUID());
-
-        jobManagerRunnerFactory.completeJobManagerRunnerInitialization();
 
         // Ensure job is running
         CommonTestUtils.waitUntilCondition(
@@ -1008,7 +1001,12 @@ public class DispatcherTest extends TestLogger {
 
             this.jobManagerStatusListener = jobManagerStatusListener;
             this.testingRunner =
-                    new TestingJobManagerRunner.Builder().setJobId(jobGraph.getJobID()).build();
+                    new BlockingTestingJobManagerRunner(
+                            jobGraph.getJobID(),
+                            false,
+                            new CompletableFuture<>(),
+                            new CompletableFuture<>(),
+                            jobManagerStatusListener);
 
             TestingJobMasterGateway testingJobMasterGateway =
                     new TestingJobMasterGatewayBuilder()

@@ -76,16 +76,14 @@ import javax.annotation.Nonnull;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayDeque;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Optional;
-import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
@@ -339,10 +337,14 @@ public class DispatcherResourceCleanupTest extends TestLogger {
                         .setJobId(jobId)
                         .build();
 
-        final Queue<JobManagerRunner> jobManagerRunners =
-                new ArrayDeque<>(Arrays.asList(testingJobManagerRunner));
+        startDispatcher(
+                new InjectJobManagerRunnerFactory(
+                        (jobManagerStatusListener) -> {
+                            testingJobManagerRunner.setJobManagerStatusListener(
+                                    jobManagerStatusListener);
+                            return testingJobManagerRunner;
+                        }));
 
-        startDispatcher(new QueueJobManagerRunnerFactory(jobManagerRunners));
         submitJob();
 
         final CompletableFuture<Void> dispatcherTerminationFuture = dispatcher.closeAsync();
@@ -636,11 +638,14 @@ public class DispatcherResourceCleanupTest extends TestLogger {
         }
     }
 
-    private static final class QueueJobManagerRunnerFactory implements JobManagerRunnerFactory {
-        private final Queue<? extends JobManagerRunner> jobManagerRunners;
+    private static final class InjectJobManagerRunnerFactory implements JobManagerRunnerFactory {
+        private final Function<JobManagerStatusListener, ? extends JobManagerRunner>
+                jobManagerRunnerProvider;
 
-        private QueueJobManagerRunnerFactory(Queue<? extends JobManagerRunner> jobManagerRunners) {
-            this.jobManagerRunners = jobManagerRunners;
+        private InjectJobManagerRunnerFactory(
+                Function<JobManagerStatusListener, ? extends JobManagerRunner>
+                        jobManagerRunnerProvider) {
+            this.jobManagerRunnerProvider = jobManagerRunnerProvider;
         }
 
         @Override
@@ -655,11 +660,7 @@ public class DispatcherResourceCleanupTest extends TestLogger {
                 FatalErrorHandler fatalErrorHandler,
                 long initializationTimestamp,
                 JobManagerStatusListener jobManagerStatusListener) {
-            return Optional.ofNullable(jobManagerRunners.poll())
-                    .orElseThrow(
-                            () ->
-                                    new IllegalStateException(
-                                            "Cannot create more JobManagerRunners."));
+            return jobManagerRunnerProvider.apply(jobManagerStatusListener);
         }
     }
 

@@ -40,9 +40,9 @@ public class TestingJobManagerRunner implements JobManagerRunner {
 
     private final OneShotLatch closeAsyncCalledLatch = new OneShotLatch();
 
-    private final JobManagerStatusListener jobManagerStatusListener;
+    private JobManagerStatusListener jobManagerStatusListener;
 
-    private TestingJobManagerRunner(
+    protected TestingJobManagerRunner(
             JobID jobId,
             boolean blockingTermination,
             CompletableFuture<JobMasterGateway> jobMasterGatewayFuture,
@@ -63,6 +63,8 @@ public class TestingJobManagerRunner implements JobManagerRunner {
 
     @Override
     public void start() throws Exception {
+        Preconditions.checkNotNull(
+                jobManagerStatusListener, "JobManager status listener must be set");
         jobManagerStatusListener.onJobManagerStarted(this);
     }
 
@@ -120,7 +122,14 @@ public class TestingJobManagerRunner implements JobManagerRunner {
     }
 
     public void failInitialization(Throwable failure) {
+        Preconditions.checkNotNull(
+                jobManagerStatusListener, "JobManager status listener must be set");
         jobManagerStatusListener.onJobManagerInitializationFailed(failure);
+    }
+
+    public void setJobManagerStatusListener(JobManagerStatusListener jobManagerStatusListener) {
+        Preconditions.checkNotNull(jobManagerStatusListener, "The passed listener is null");
+        this.jobManagerStatusListener = jobManagerStatusListener;
     }
 
     /** {@code Builder} for instantiating {@link TestingJobManagerRunner} instances. */
