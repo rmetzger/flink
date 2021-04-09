@@ -28,6 +28,7 @@ import org.apache.flink.metrics.MetricGroup;
 import org.apache.flink.runtime.blob.BlobServer;
 import org.apache.flink.runtime.checkpoint.Checkpoints;
 import org.apache.flink.runtime.client.DuplicateJobSubmissionException;
+import org.apache.flink.runtime.client.JobExecutionException;
 import org.apache.flink.runtime.client.JobSubmissionException;
 import org.apache.flink.runtime.clusterframework.ApplicationStatus;
 import org.apache.flink.runtime.clusterframework.types.ResourceID;
@@ -392,7 +393,7 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
         runJob(jobGraph, ExecutionType.SUBMISSION);
     }
 
-    private void runJob(JobGraph jobGraph, ExecutionType executionType) throws Exception {
+    private void runJob(JobGraph jobGraph, ExecutionType executionType) {
         final JobID jobId = jobGraph.getJobID();
         Preconditions.checkState(!runningJobs.containsKey(jobId));
         long initializationTimestamp = System.currentTimeMillis();
@@ -416,7 +417,8 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
                             dispatcherJob);
             runner.start();
         } catch (Exception jobManagerRunnerException) {
-            dispatcherJob.onJobManagerInitializationFailed(jobManagerRunnerException);
+            dispatcherJob.onJobManagerInitializationFailed(
+                    new JobExecutionException(jobId, jobManagerRunnerException));
         }
 
         final CompletableFuture<CleanupJobState> cleanupJobStateFuture =

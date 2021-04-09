@@ -427,6 +427,10 @@ public class DispatcherTest extends TestLogger {
         assertEquals(1, multiDetails.getJobs().size());
         assertEquals(jobID, multiDetails.getJobs().iterator().next().getJobId());
 
+        // TODO: I changed the testingjobmanagerrunner to always complete the initialization in the
+        // start method. Revisit this.
+        // TODO issue is probably that by completing the init in the start method??? (there was an
+        // issue with executing the completion in start (but that was only about blocking there.
         blockingJobManager.completeJobManagerRunnerInitialization();
 
         // ensure job is running

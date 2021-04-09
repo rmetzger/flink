@@ -27,6 +27,7 @@ import javax.annotation.Nullable;
 
 import java.util.concurrent.CompletableFuture;
 
+/** This class tracks the JobStatus for {@link DispatcherJob} with the JobManagerRunner future. */
 public class DispatcherJobStatus {
     private Status status;
 

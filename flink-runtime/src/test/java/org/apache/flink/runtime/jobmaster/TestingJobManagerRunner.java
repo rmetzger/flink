@@ -62,7 +62,9 @@ public class TestingJobManagerRunner implements JobManagerRunner {
     }
 
     @Override
-    public void start() throws Exception {}
+    public void start() throws Exception {
+        jobManagerStatusListener.onJobManagerStarted(this);
+    }
 
     @Override
     public CompletableFuture<JobMasterGateway> getJobMasterGateway() {
