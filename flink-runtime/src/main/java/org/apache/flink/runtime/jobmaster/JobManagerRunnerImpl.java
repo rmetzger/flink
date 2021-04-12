@@ -19,6 +19,7 @@
 package org.apache.flink.runtime.jobmaster;
 
 import org.apache.flink.api.common.JobID;
+import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutor;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.execution.librarycache.LibraryCacheManager;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
@@ -90,6 +91,7 @@ public class JobManagerRunnerImpl
     private final ClassLoader userCodeClassLoader;
 
     private final long initializationTimestamp;
+    private final ComponentMainThreadExecutor mainThreadExecutor;
 
     private CompletableFuture<Void> leadershipOperation;
 
@@ -119,7 +121,8 @@ public class JobManagerRunnerImpl
             final Executor executor,
             final FatalErrorHandler fatalErrorHandler,
             long initializationTimestamp,
-            JobManagerStatusListener jobManagerStatusListener)
+            JobManagerStatusListener jobManagerStatusListener,
+            ComponentMainThreadExecutor mainThreadExecutor)
             throws Exception {
         this.jobManagerStatusListener = jobManagerStatusListener;
 
@@ -133,6 +136,7 @@ public class JobManagerRunnerImpl
         this.executor = checkNotNull(executor);
         this.fatalErrorHandler = checkNotNull(fatalErrorHandler);
         this.initializationTimestamp = initializationTimestamp;
+        this.mainThreadExecutor = mainThreadExecutor;
 
         checkArgument(jobGraph.getNumberOfVertices() > 0, "The given job is empty");
 
@@ -208,33 +212,30 @@ public class JobManagerRunnerImpl
                     jobManagerTerminationFuture = jobMasterService.closeAsync();
                 }
 
-                FutureUtils.assertNoException(
-                        jobManagerTerminationFuture.whenComplete(
-                                (Void ignored, Throwable throwable) -> {
-                                    try {
-                                        leaderElectionService.stop();
-                                    } catch (Throwable t) {
-                                        throwable =
-                                                ExceptionUtils.firstOrSuppressed(
-                                                        t,
-                                                        ExceptionUtils.stripCompletionException(
-                                                                throwable));
-                                    }
+                jobManagerTerminationFuture.whenComplete(
+                        (Void ignored, Throwable throwable) -> {
+                            try {
+                                leaderElectionService.stop();
+                            } catch (Throwable t) {
+                                throwable =
+                                        ExceptionUtils.firstOrSuppressed(
+                                                t,
+                                                ExceptionUtils.stripCompletionException(throwable));
+                            }
 
-                                    classLoaderLease.release();
+                            classLoaderLease.release();
 
-                                    resultFuture.complete(
-                                            JobManagerRunnerResult.forJobNotFinished());
+                            resultFuture.complete(JobManagerRunnerResult.forJobNotFinished());
 
-                                    if (throwable != null) {
-                                        terminationFuture.completeExceptionally(
-                                                new FlinkException(
-                                                        "Could not properly shut down the JobManagerRunner",
-                                                        throwable));
-                                    } else {
-                                        terminationFuture.complete(null);
-                                    }
-                                }));
+                            if (throwable != null) {
+                                terminationFuture.completeExceptionally(
+                                        new FlinkException(
+                                                "Could not properly shut down the JobManagerRunner",
+                                                throwable));
+                            } else {
+                                terminationFuture.complete(null);
+                            }
+                        });
             }
 
             return terminationFuture;
@@ -355,7 +356,6 @@ public class JobManagerRunnerImpl
                             jobGraph.getJobID()),
                     e);
         }
-
         startJobMasterServiceSafely(leaderSessionId);
 
         if (jobMasterService != null) {
@@ -363,6 +363,7 @@ public class JobManagerRunnerImpl
         }
     }
 
+    @GuardedBy("lock")
     private void startJobMasterServiceSafely(UUID leaderSessionId) {
         checkState(jobMasterService == null, "JobMasterService must be null before being started.");
 
@@ -375,29 +376,33 @@ public class JobManagerRunnerImpl
                             userCodeClassLoader,
                             initializationTimestamp);
 
-            jobManagerStatusListener.onJobManagerStarted(this);
+            // Execute listener notification asynchronously in the main thread executor to make sure
+            // this "grant leadership" operation is properly completed before the next operation is
+            // started. With the current implementation DispatcherJob might call closeAsync()
+            // leading to concurrent access under the "lock".
+            FutureUtils.assertNoException(
+                    CompletableFuture.runAsync(
+                            () -> jobManagerStatusListener.onJobManagerStarted(this),
+                            mainThreadExecutor));
 
             jobMasterService = newJobMasterService;
 
-            FutureUtils.assertNoException(
-                    jobMasterService
-                            .getTerminationFuture()
-                            .whenComplete(
-                                    (unused, throwable) -> {
-                                        jobManagerStatusListener.onJobManagerStopped();
-                                        if (throwable != null) {
-                                            synchronized (lock) {
-                                                // check that we are still running and the
-                                                // JobMasterService
-                                                // is still valid
-                                                if (!shutdown
-                                                        && newJobMasterService
-                                                                == jobMasterService) {
-                                                    handleJobManagerRunnerError(throwable);
-                                                }
-                                            }
+            jobMasterService
+                    .getTerminationFuture()
+                    .whenComplete(
+                            (unused, throwable) -> {
+                                jobManagerStatusListener.onJobManagerStopped();
+                                if (throwable != null) {
+                                    synchronized (lock) {
+                                        // check that we are still running and the
+                                        // JobMasterService
+                                        // is still valid
+                                        if (!shutdown && newJobMasterService == jobMasterService) {
+                                            handleJobManagerRunnerError(throwable);
                                         }
-                                    }));
+                                    }
+                                }
+                            });
         } catch (Exception initializationException) {
             jobManagerStatusListener.onJobManagerInitializationFailed(initializationException);
         }

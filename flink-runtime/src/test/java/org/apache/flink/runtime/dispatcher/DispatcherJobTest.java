@@ -21,12 +21,12 @@ package org.apache.flink.runtime.dispatcher;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.api.common.time.Time;
-import org.apache.flink.core.testutils.CommonTestUtils;
 import org.apache.flink.runtime.executiongraph.ArchivedExecutionGraph;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobGraphTestUtils;
 import org.apache.flink.runtime.jobmaster.JobManagerRunner;
 import org.apache.flink.runtime.jobmaster.JobManagerRunnerResult;
+import org.apache.flink.runtime.jobmaster.JobNotFinishedException;
 import org.apache.flink.runtime.jobmaster.TestingJobManagerRunner;
 import org.apache.flink.runtime.jobmaster.utils.TestingJobMasterGateway;
 import org.apache.flink.runtime.jobmaster.utils.TestingJobMasterGatewayBuilder;
@@ -40,6 +40,8 @@ import org.junit.Test;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
+import static org.apache.flink.core.testutils.CommonTestUtils.assertThrows;
+import static org.apache.flink.core.testutils.FlinkMatchers.containsCause;
 import static org.hamcrest.core.Is.is;
 import static org.hamcrest.core.StringContains.containsString;
 import static org.junit.Assert.assertThat;
@@ -160,7 +162,7 @@ public class DispatcherJobTest extends TestLogger {
 
         assertJobStatus(dispatcherJob, JobStatus.FAILED);
 
-        CommonTestUtils.assertThrows(
+        assertThrows(
                 "Artificial failure",
                 ExecutionException.class,
                 () -> dispatcherJob.cancel(TIMEOUT).get());
@@ -212,6 +214,36 @@ public class DispatcherJobTest extends TestLogger {
     }
 
     @Test
+    public void testJobNotFinishedException() {
+        TestContext testContext = createTestContext();
+        DispatcherJob dispatcherJob = testContext.getDispatcherJob();
+
+        testContext.setRunning();
+
+        testContext.abortJob();
+
+        try {
+            dispatcherJob.getResultFuture().get();
+        } catch (Throwable t) {
+            assertThat(t, containsCause(JobNotFinishedException.class));
+        }
+    }
+
+    @Test
+    public void testLeadershipLoss() throws Exception {
+        TestContext testContext = createTestContext();
+        DispatcherJob dispatcherJob = testContext.getDispatcherJob();
+
+        testContext.setRunning();
+
+        dispatcherJob.onJobManagerStopped();
+
+        assertThat(dispatcherJob.requestJobStatus(TIMEOUT).get(), is(JobStatus.INITIALIZING));
+
+        testContext.setRunning();
+    }
+
+    @Test
     public void testCloseWhileInitializingSuccessfully() throws Exception {
         TestContext testContext = createTestContext();
         DispatcherJob dispatcherJob = testContext.getDispatcherJob();
@@ -227,8 +259,7 @@ public class DispatcherJobTest extends TestLogger {
 
         // ensure the result future is complete (how it completes is up to the JobManager)
         CompletableFuture<DispatcherJobResult> resultFuture = dispatcherJob.getResultFuture();
-        CommonTestUtils.assertThrows(
-                "has not been finished", ExecutionException.class, resultFuture::get);
+        assertThrows("has not been finished", ExecutionException.class, resultFuture::get);
     }
 
     @Test
@@ -263,8 +294,7 @@ public class DispatcherJobTest extends TestLogger {
 
         // result future should complete exceptionally.
         CompletableFuture<DispatcherJobResult> resultFuture = dispatcherJob.getResultFuture();
-        CommonTestUtils.assertThrows(
-                "has not been finished", ExecutionException.class, resultFuture::get);
+        assertThrows("has not been finished", ExecutionException.class, resultFuture::get);
     }
 
     @Test(expected = IllegalStateException.class)
@@ -358,6 +388,11 @@ public class DispatcherJobTest extends TestLogger {
                             .setResultFuture(resultFuture)
                             .build();
             dispatcherJob.onJobManagerStarted(jobManagerRunner);
+        }
+
+        public void abortJob() {
+            internalJobStatus = JobStatus.SUSPENDED;
+            resultFuture.complete(JobManagerRunnerResult.forJobNotFinished());
         }
 
         public void finishJob() {

@@ -34,6 +34,7 @@ import org.apache.flink.runtime.checkpoint.StandaloneCheckpointRecoveryFactory;
 import org.apache.flink.runtime.checkpoint.metadata.CheckpointMetadata;
 import org.apache.flink.runtime.client.JobSubmissionException;
 import org.apache.flink.runtime.clusterframework.ApplicationStatus;
+import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutor;
 import org.apache.flink.runtime.executiongraph.ArchivedExecutionGraph;
 import org.apache.flink.runtime.executiongraph.ErrorInfo;
 import org.apache.flink.runtime.heartbeat.HeartbeatServices;
@@ -236,7 +237,8 @@ public class DispatcherTest extends TestLogger {
                 JobManagerJobMetricGroupFactory jobManagerJobMetricGroupFactory,
                 FatalErrorHandler fatalErrorHandler,
                 long initializationTimestamp,
-                JobManagerStatusListener jobManagerStatusListener)
+                JobManagerStatusListener jobManagerStatusListener,
+                ComponentMainThreadExecutor mainThreadExecutor)
                 throws Exception {
             initializationTimestampQueue.offer(initializationTimestamp);
             return DefaultJobManagerRunnerFactory.INSTANCE.createJobManagerRunner(
@@ -249,7 +251,8 @@ public class DispatcherTest extends TestLogger {
                     jobManagerJobMetricGroupFactory,
                     fatalErrorHandler,
                     initializationTimestamp,
-                    jobManagerStatusListener);
+                    jobManagerStatusListener,
+                    mainThreadExecutor);
         }
     }
 
@@ -945,7 +948,8 @@ public class DispatcherTest extends TestLogger {
                 JobManagerJobMetricGroupFactory jobManagerJobMetricGroupFactory,
                 FatalErrorHandler fatalErrorHandler,
                 long initializationTimestamp,
-                JobManagerStatusListener jobManagerStatusListener)
+                JobManagerStatusListener jobManagerStatusListener,
+                ComponentMainThreadExecutor mainThreadExecutor)
                 throws Exception {
             jobManagerRunnerCreationRunnable.run();
 
@@ -961,7 +965,8 @@ public class DispatcherTest extends TestLogger {
                             jobManagerJobMetricGroupFactory,
                             fatalErrorHandler,
                             initializationTimestamp,
-                            jobManagerStatusListener);
+                            jobManagerStatusListener,
+                            mainThreadExecutor);
 
             TestingJobMasterGateway testingJobMasterGateway =
                     new TestingJobMasterGatewayBuilder()
@@ -996,7 +1001,8 @@ public class DispatcherTest extends TestLogger {
                 JobManagerJobMetricGroupFactory jobManagerJobMetricGroupFactory,
                 FatalErrorHandler fatalErrorHandler,
                 long initializationTimestamp,
-                JobManagerStatusListener jobManagerStatusListener)
+                JobManagerStatusListener jobManagerStatusListener,
+                ComponentMainThreadExecutor mainThreadExecutor)
                 throws Exception {
 
             this.jobManagerStatusListener = jobManagerStatusListener;
@@ -1082,7 +1088,8 @@ public class DispatcherTest extends TestLogger {
                 JobManagerJobMetricGroupFactory jobManagerJobMetricGroupFactory,
                 FatalErrorHandler fatalErrorHandler,
                 long initializationTimestamp,
-                JobManagerStatusListener jobManagerStatusListener)
+                JobManagerStatusListener jobManagerStatusListener,
+                ComponentMainThreadExecutor mainThreadExecutor)
                 throws Exception {
             assertEquals(expectedJobId, jobGraph.getJobID());
 
@@ -1098,7 +1105,8 @@ public class DispatcherTest extends TestLogger {
                     jobManagerJobMetricGroupFactory,
                     fatalErrorHandler,
                     initializationTimestamp,
-                    jobManagerStatusListener);
+                    jobManagerStatusListener,
+                    mainThreadExecutor);
         }
     }
 

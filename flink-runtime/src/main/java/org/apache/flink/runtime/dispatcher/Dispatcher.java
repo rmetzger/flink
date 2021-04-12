@@ -414,7 +414,8 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
                             new DefaultJobManagerJobMetricGroupFactory(jobManagerMetricGroup),
                             fatalErrorHandler,
                             initializationTimestamp,
-                            dispatcherJob);
+                            dispatcherJob,
+                            getMainThreadExecutor());
             runner.start();
         } catch (Exception jobManagerRunnerException) {
             dispatcherJob.onJobManagerInitializationFailed(

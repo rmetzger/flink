@@ -22,6 +22,7 @@ import org.apache.flink.api.common.JobStatus;
 import org.apache.flink.core.testutils.FlinkMatchers;
 import org.apache.flink.core.testutils.OneShotLatch;
 import org.apache.flink.runtime.checkpoint.StandaloneCheckpointRecoveryFactory;
+import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutorServiceAdapter;
 import org.apache.flink.runtime.execution.librarycache.LibraryCacheManager;
 import org.apache.flink.runtime.execution.librarycache.TestingClassLoaderLease;
 import org.apache.flink.runtime.highavailability.TestingHighAvailabilityServices;
@@ -374,7 +375,8 @@ public class JobManagerRunnerImplTest extends TestLogger {
                 TestingUtils.defaultExecutor(),
                 fatalErrorHandler,
                 System.currentTimeMillis(),
-                jobManagerStatusListener);
+                jobManagerStatusListener,
+                ComponentMainThreadExecutorServiceAdapter.forMainThread());
     }
 
     private class TestingJobManagerStatusListener implements JobManagerStatusListener {

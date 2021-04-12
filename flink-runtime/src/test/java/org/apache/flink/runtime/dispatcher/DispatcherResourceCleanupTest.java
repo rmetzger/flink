@@ -32,6 +32,7 @@ import org.apache.flink.runtime.blob.TestingBlobStore;
 import org.apache.flink.runtime.blob.TestingBlobStoreBuilder;
 import org.apache.flink.runtime.client.DuplicateJobSubmissionException;
 import org.apache.flink.runtime.client.JobExecutionException;
+import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutor;
 import org.apache.flink.runtime.executiongraph.ArchivedExecutionGraph;
 import org.apache.flink.runtime.heartbeat.HeartbeatServices;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
@@ -659,7 +660,8 @@ public class DispatcherResourceCleanupTest extends TestLogger {
                 JobManagerJobMetricGroupFactory jobManagerJobMetricGroupFactory,
                 FatalErrorHandler fatalErrorHandler,
                 long initializationTimestamp,
-                JobManagerStatusListener jobManagerStatusListener) {
+                JobManagerStatusListener jobManagerStatusListener,
+                ComponentMainThreadExecutor mainThreadExecutor) {
             return jobManagerRunnerProvider.apply(jobManagerStatusListener);
         }
     }
@@ -682,7 +684,8 @@ public class DispatcherResourceCleanupTest extends TestLogger {
                 JobManagerJobMetricGroupFactory jobManagerJobMetricGroupFactory,
                 FatalErrorHandler fatalErrorHandler,
                 long initializationTimestamp,
-                JobManagerStatusListener jobManagerStatusListener)
+                JobManagerStatusListener jobManagerStatusListener,
+                ComponentMainThreadExecutor mainThreadExecutor)
                 throws Exception {
             throw testException;
         }

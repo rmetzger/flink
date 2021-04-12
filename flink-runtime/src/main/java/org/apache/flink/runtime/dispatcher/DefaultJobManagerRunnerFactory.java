@@ -21,6 +21,7 @@ package org.apache.flink.runtime.dispatcher;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.JobManagerOptions;
 import org.apache.flink.configuration.SchedulerExecutionMode;
+import org.apache.flink.runtime.concurrent.ComponentMainThreadExecutor;
 import org.apache.flink.runtime.heartbeat.HeartbeatServices;
 import org.apache.flink.runtime.highavailability.HighAvailabilityServices;
 import org.apache.flink.runtime.jobgraph.JobGraph;
@@ -55,7 +56,8 @@ public enum DefaultJobManagerRunnerFactory implements JobManagerRunnerFactory {
             JobManagerJobMetricGroupFactory jobManagerJobMetricGroupFactory,
             FatalErrorHandler fatalErrorHandler,
             long initializationTimestamp,
-            JobManagerStatusListener jobManagerStatusListener)
+            JobManagerStatusListener jobManagerStatusListener,
+            ComponentMainThreadExecutor mainThreadExecutor)
             throws Exception {
 
         final JobMasterConfiguration jobMasterConfiguration =
@@ -99,6 +101,7 @@ public enum DefaultJobManagerRunnerFactory implements JobManagerRunnerFactory {
                 jobManagerServices.getScheduledExecutorService(),
                 fatalErrorHandler,
                 initializationTimestamp,
-                jobManagerStatusListener);
+                jobManagerStatusListener,
+                mainThreadExecutor);
     }
 }
