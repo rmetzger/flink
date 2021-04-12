@@ -212,30 +212,34 @@ public class JobManagerRunnerImpl
                     jobManagerTerminationFuture = jobMasterService.closeAsync();
                 }
 
-                jobManagerTerminationFuture.whenComplete(
-                        (Void ignored, Throwable throwable) -> {
-                            try {
-                                leaderElectionService.stop();
-                            } catch (Throwable t) {
-                                throwable =
-                                        ExceptionUtils.firstOrSuppressed(
-                                                t,
-                                                ExceptionUtils.stripCompletionException(throwable));
-                            }
+                FutureUtils.assertNoException(
+                        jobManagerTerminationFuture.handle(
+                                (Void ignored, Throwable throwable) -> {
+                                    try {
+                                        leaderElectionService.stop();
+                                    } catch (Throwable t) {
+                                        throwable =
+                                                ExceptionUtils.firstOrSuppressed(
+                                                        t,
+                                                        ExceptionUtils.stripCompletionException(
+                                                                throwable));
+                                    }
 
-                            classLoaderLease.release();
+                                    classLoaderLease.release();
 
-                            resultFuture.complete(JobManagerRunnerResult.forJobNotFinished());
+                                    resultFuture.complete(
+                                            JobManagerRunnerResult.forJobNotFinished());
 
-                            if (throwable != null) {
-                                terminationFuture.completeExceptionally(
-                                        new FlinkException(
-                                                "Could not properly shut down the JobManagerRunner",
-                                                throwable));
-                            } else {
-                                terminationFuture.complete(null);
-                            }
-                        });
+                                    if (throwable != null) {
+                                        terminationFuture.completeExceptionally(
+                                                new FlinkException(
+                                                        "Could not properly shut down the JobManagerRunner",
+                                                        throwable));
+                                    } else {
+                                        terminationFuture.complete(null);
+                                    }
+                                    return null;
+                                }));
             }
 
             return terminationFuture;
@@ -387,22 +391,26 @@ public class JobManagerRunnerImpl
 
             jobMasterService = newJobMasterService;
 
-            jobMasterService
-                    .getTerminationFuture()
-                    .whenComplete(
-                            (unused, throwable) -> {
-                                jobManagerStatusListener.onJobManagerStopped();
-                                if (throwable != null) {
-                                    synchronized (lock) {
-                                        // check that we are still running and the
-                                        // JobMasterService
-                                        // is still valid
-                                        if (!shutdown && newJobMasterService == jobMasterService) {
-                                            handleJobManagerRunnerError(throwable);
+            FutureUtils.assertNoException(
+                    jobMasterService
+                            .getTerminationFuture()
+                            .handle(
+                                    (unused, throwable) -> {
+                                        jobManagerStatusListener.onJobManagerStopped();
+                                        if (throwable != null) {
+                                            synchronized (lock) {
+                                                // check that we are still running and the
+                                                // JobMasterService
+                                                // is still valid
+                                                if (!shutdown
+                                                        && newJobMasterService
+                                                                == jobMasterService) {
+                                                    handleJobManagerRunnerError(throwable);
+                                                }
+                                            }
                                         }
-                                    }
-                                }
-                            });
+                                        return null;
+                                    }));
         } catch (Exception initializationException) {
             jobManagerStatusListener.onJobManagerInitializationFailed(initializationException);
         }

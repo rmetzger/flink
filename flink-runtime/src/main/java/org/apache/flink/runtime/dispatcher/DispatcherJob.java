@@ -46,23 +46,25 @@ import java.util.concurrent.CompletableFuture;
 /** Abstraction used by the {@link Dispatcher} to manage jobs. */
 public final class DispatcherJob implements AutoCloseableAsync, JobManagerStatusListener {
 
-    private final Logger log = LoggerFactory.getLogger(DispatcherJob.class);
+    private static final Logger log = LoggerFactory.getLogger(DispatcherJob.class);
 
-    private CompletableFuture<DispatcherJobResult> jobResultFuture;
+    private final CompletableFuture<DispatcherJobResult> jobResultFuture;
+
+    private final long initializationTimestamp;
+
+    private final JobID jobId;
+
+    private final String jobName;
+
+    // We need to guard access to the status field using this lock, because the methods implemented
+    // by the JobManagerStatusListener might get called from any thread.
+    private final Object lock = new Object();
 
     // if the termination future is set, we are signaling that this DispatcherJob is closing / has
     // been closed
     @GuardedBy("lock")
     @Nullable
     private CompletableFuture<Void> terminationFuture;
-
-    private final long initializationTimestamp;
-    private final JobID jobId;
-    private final String jobName;
-
-    // We need to guard access to the status field, because onJobManagerStarted() gets called from
-    // an executor pool thread.
-    private final Object lock = new Object();
 
     @GuardedBy("lock")
     private final DispatcherJobStatus jobStatus = new DispatcherJobStatus();
@@ -88,17 +90,20 @@ public final class DispatcherJob implements AutoCloseableAsync, JobManagerStatus
             jobStatus.setJobManagerCreated(jobManagerRunner);
         }
 
-        jobManagerRunner
-                .getResultFuture()
-                .whenComplete(
-                        (jobManagerRunnerResult, resultThrowable) -> {
-                            if (jobManagerRunnerResult != null) {
-                                handleJobManagerRunnerResult(jobManagerRunnerResult);
-                            } else {
-                                jobResultFuture.completeExceptionally(
-                                        ExceptionUtils.stripCompletionException(resultThrowable));
-                            }
-                        });
+        FutureUtils.assertNoException(
+                jobManagerRunner
+                        .getResultFuture()
+                        .handle(
+                                (jobManagerRunnerResult, resultThrowable) -> {
+                                    if (jobManagerRunnerResult != null) {
+                                        handleJobManagerRunnerResult(jobManagerRunnerResult);
+                                    } else {
+                                        jobResultFuture.completeExceptionally(
+                                                ExceptionUtils.stripCompletionException(
+                                                        resultThrowable));
+                                    }
+                                    return null;
+                                }));
     }
 
     private void handleJobManagerRunnerResult(JobManagerRunnerResult jobManagerRunnerResult) {
@@ -210,7 +215,7 @@ public final class DispatcherJob implements AutoCloseableAsync, JobManagerStatus
                                 executionGraphInfo.getArchivedExecutionGraph().getState());
     }
 
-    boolean isJobManagerCreatedOrFailed() {
+    boolean isJobMasterGatewayAvailable() {
         synchronized (lock) {
             return jobStatus.isJobManagerCreatedOrFailed();
         }
@@ -219,8 +224,8 @@ public final class DispatcherJob implements AutoCloseableAsync, JobManagerStatus
     /** Returns a future completing to the ExecutionGraphInfo of the job. */
     public CompletableFuture<ExecutionGraphInfo> requestJob(Time timeout) {
         synchronized (lock) {
-            if (jobStatus.isJobManagerCreatedOrFailed()) {
-                if (jobResultFuture.isDone()) { // job is not running anymore
+            if (isJobMasterGatewayAvailable()) {
+                if (jobResultFuture.isDone()) { // job is not running anymore (init failed)
                     return jobResultFuture.thenApply(DispatcherJobResult::getExecutionGraphInfo);
                 }
                 return getJobMasterGateway()
@@ -244,7 +249,6 @@ public final class DispatcherJob implements AutoCloseableAsync, JobManagerStatus
      *
      * @return the {@link JobMasterGateway}. The future will complete exceptionally if the
      *     JobManagerRunner initialization failed.
-     * @throws IllegalStateException is thrown if the job is not initialized
      */
     public CompletableFuture<JobMasterGateway> getJobMasterGateway() {
         synchronized (lock) {

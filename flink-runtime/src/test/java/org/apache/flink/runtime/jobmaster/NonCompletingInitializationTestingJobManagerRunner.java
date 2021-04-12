@@ -23,9 +23,9 @@ import org.apache.flink.api.common.JobID;
 import java.util.concurrent.CompletableFuture;
 
 /** TestingJobManagerRunner that doesn't automatically complete initialization. */
-public class BlockingTestingJobManagerRunner extends TestingJobManagerRunner {
+public class NonCompletingInitializationTestingJobManagerRunner extends TestingJobManagerRunner {
 
-    public BlockingTestingJobManagerRunner(
+    public NonCompletingInitializationTestingJobManagerRunner(
             JobID jobId,
             boolean blockingTermination,
             CompletableFuture<JobMasterGateway> jobMasterGatewayFuture,

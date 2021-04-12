@@ -45,12 +45,12 @@ import org.apache.flink.runtime.jobgraph.JobGraphBuilder;
 import org.apache.flink.runtime.jobgraph.JobGraphTestUtils;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobmanager.JobGraphWriter;
-import org.apache.flink.runtime.jobmaster.BlockingTestingJobManagerRunner;
 import org.apache.flink.runtime.jobmaster.JobManagerRunner;
 import org.apache.flink.runtime.jobmaster.JobManagerSharedServices;
 import org.apache.flink.runtime.jobmaster.JobManagerStatusListener;
 import org.apache.flink.runtime.jobmaster.JobNotFinishedException;
 import org.apache.flink.runtime.jobmaster.JobResult;
+import org.apache.flink.runtime.jobmaster.NonCompletingInitializationTestingJobManagerRunner;
 import org.apache.flink.runtime.jobmaster.TestingJobManagerRunner;
 import org.apache.flink.runtime.jobmaster.factories.JobManagerJobMetricGroupFactory;
 import org.apache.flink.runtime.jobmaster.utils.TestingJobMasterGateway;
@@ -409,8 +409,8 @@ public class DispatcherTest extends TestLogger {
 
     @Test
     public void testNonBlockingJobSubmission() throws Exception {
-        final BlockingInitializationJobManagerRunnerFactory blockingJobManager =
-                new BlockingInitializationJobManagerRunnerFactory();
+        final ManuallyCompletingInitializationJobManagerRunnerFactory blockingJobManager =
+                new ManuallyCompletingInitializationJobManagerRunnerFactory();
         dispatcher = createAndStartDispatcher(heartbeatServices, haServices, blockingJobManager);
         DispatcherGateway dispatcherGateway = dispatcher.getSelfGateway(DispatcherGateway.class);
 
@@ -430,10 +430,6 @@ public class DispatcherTest extends TestLogger {
         assertEquals(1, multiDetails.getJobs().size());
         assertEquals(jobID, multiDetails.getJobs().iterator().next().getJobId());
 
-        // TODO: I changed the testingjobmanagerrunner to always complete the initialization in the
-        // start method. Revisit this.
-        // TODO issue is probably that by completing the init in the start method??? (there was an
-        // issue with executing the completion in start (but that was only about blocking there.
         blockingJobManager.completeJobManagerRunnerInitialization();
 
         // ensure job is running
@@ -445,8 +441,8 @@ public class DispatcherTest extends TestLogger {
 
     @Test
     public void testInvalidCallDuringInitialization() throws Exception {
-        BlockingInitializationJobManagerRunnerFactory blockingJobManagerRunner =
-                new BlockingInitializationJobManagerRunnerFactory();
+        ManuallyCompletingInitializationJobManagerRunnerFactory blockingJobManagerRunner =
+                new ManuallyCompletingInitializationJobManagerRunnerFactory();
 
         dispatcher =
                 createAndStartDispatcher(heartbeatServices, haServices, blockingJobManagerRunner);
@@ -987,7 +983,7 @@ public class DispatcherTest extends TestLogger {
         }
     }
 
-    private static final class BlockingInitializationJobManagerRunnerFactory
+    private static final class ManuallyCompletingInitializationJobManagerRunnerFactory
             extends TestingJobManagerRunnerFactory {
 
         @Override
@@ -1007,7 +1003,7 @@ public class DispatcherTest extends TestLogger {
 
             this.jobManagerStatusListener = jobManagerStatusListener;
             this.testingRunner =
-                    new BlockingTestingJobManagerRunner(
+                    new NonCompletingInitializationTestingJobManagerRunner(
                             jobGraph.getJobID(),
                             false,
                             new CompletableFuture<>(),

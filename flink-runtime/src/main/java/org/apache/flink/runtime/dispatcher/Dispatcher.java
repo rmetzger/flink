@@ -579,7 +579,6 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
     @Override
     public CompletableFuture<JobStatus> requestJobStatus(JobID jobId, Time timeout) {
         Optional<DispatcherJob> maybeJob = getDispatcherJob(jobId);
-
         return maybeJob.map(job -> job.requestJobStatus(timeout))
                 .orElseGet(
                         () -> {
@@ -870,7 +869,7 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
         if (job == null) {
             return FutureUtils.completedExceptionally(new FlinkJobNotFoundException(jobId));
         }
-        if (!job.isJobManagerCreatedOrFailed()) {
+        if (!job.isJobMasterGatewayAvailable()) {
             return FutureUtils.completedExceptionally(
                     new UnavailableDispatcherOperationException(
                             "Unable to get JobMasterGateway for initializing job. "

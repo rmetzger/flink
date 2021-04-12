@@ -56,7 +56,7 @@ public class DispatcherJobTest extends TestLogger {
         TestContext testContext = createTestContext();
         DispatcherJob dispatcherJob = testContext.getDispatcherJob();
 
-        assertThat(dispatcherJob.isJobManagerCreatedOrFailed(), is(false));
+        assertThat(dispatcherJob.isJobMasterGatewayAvailable(), is(false));
         assertThat(dispatcherJob.getResultFuture().isDone(), is(false));
         assertJobStatus(dispatcherJob, JobStatus.INITIALIZING);
     }
@@ -74,7 +74,7 @@ public class DispatcherJobTest extends TestLogger {
         // result future not done
         assertThat(dispatcherJob.getResultFuture().isDone(), is(false));
 
-        assertThat(dispatcherJob.isJobManagerCreatedOrFailed(), is(true));
+        assertThat(dispatcherJob.isJobMasterGatewayAvailable(), is(true));
     }
 
     @Test
@@ -105,7 +105,7 @@ public class DispatcherJobTest extends TestLogger {
         CompletableFuture<Acknowledge> cancelFuture = dispatcherJob.cancel(TIMEOUT);
 
         assertThat(cancelFuture.isDone(), is(false));
-        assertThat(dispatcherJob.isJobManagerCreatedOrFailed(), is(false));
+        assertThat(dispatcherJob.isJobMasterGatewayAvailable(), is(false));
 
         assertJobStatus(dispatcherJob, JobStatus.CANCELLING);
 
@@ -116,7 +116,7 @@ public class DispatcherJobTest extends TestLogger {
         cancelFuture.get();
 
         assertJobStatus(dispatcherJob, JobStatus.CANCELED);
-        assertThat(dispatcherJob.isJobManagerCreatedOrFailed(), is(true));
+        assertThat(dispatcherJob.isJobMasterGatewayAvailable(), is(true));
         // assert that the result future completes
         assertThat(
                 dispatcherJob
@@ -180,7 +180,7 @@ public class DispatcherJobTest extends TestLogger {
                 new RuntimeException("Artificial failure in runner initialization");
         testContext.failInitialization(exception);
 
-        assertThat(dispatcherJob.isJobManagerCreatedOrFailed(), is(true));
+        assertThat(dispatcherJob.isJobMasterGatewayAvailable(), is(true));
         assertJobStatus(dispatcherJob, JobStatus.FAILED);
 
         ArchivedExecutionGraph aeg =
