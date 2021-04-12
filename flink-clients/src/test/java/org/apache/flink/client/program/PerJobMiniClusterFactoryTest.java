@@ -37,9 +37,11 @@ import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 import static org.apache.flink.core.testutils.CommonTestUtils.assertThrows;
+import static org.apache.flink.core.testutils.FlinkMatchers.containsMessage;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.Assert.fail;
 
 /** Tests for {@link PerJobMiniClusterFactory}. */
 public class PerJobMiniClusterFactoryTest extends TestLogger {
@@ -114,20 +116,22 @@ public class PerJobMiniClusterFactoryTest extends TestLogger {
     }
 
     @Test
-    public void testSubmissionError() throws Exception {
+    public void testSubmissionError() {
         PerJobMiniClusterFactory perJobMiniClusterFactory = initializeMiniCluster();
 
         // JobGraph is not a valid job
-
         JobGraph jobGraph = JobGraphTestUtils.emptyJobGraph();
 
-        assertThrows(
-                "Could not instantiate JobManager",
-                ExecutionException.class,
-                () ->
-                        perJobMiniClusterFactory
-                                .submitJob(jobGraph, ClassLoader.getSystemClassLoader())
-                                .get());
+        try {
+            perJobMiniClusterFactory
+                    .submitJob(jobGraph, ClassLoader.getSystemClassLoader())
+                    .get()
+                    .getJobExecutionResult()
+                    .get();
+            fail("Expect error");
+        } catch (Throwable error) {
+            assertThat(error, containsMessage("The given job is empty"));
+        }
     }
 
     @Test
