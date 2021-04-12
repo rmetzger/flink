@@ -308,7 +308,6 @@ public class DispatcherResourceCleanupTest extends TestLogger {
         assertThatHABlobsHaveBeenRemoved();
     }
 
-    // TODO
     @Test
     public void testBlobServerCleanupWhenClosingDispatcher() throws Exception {
         startDispatcherAndSubmitJob();

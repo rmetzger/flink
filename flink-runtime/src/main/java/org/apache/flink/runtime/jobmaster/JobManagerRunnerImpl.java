@@ -360,6 +360,7 @@ public class JobManagerRunnerImpl
                             jobGraph.getJobID()),
                     e);
         }
+
         startJobMasterServiceSafely(leaderSessionId);
 
         if (jobMasterService != null) {
@@ -486,7 +487,6 @@ public class JobManagerRunnerImpl
 
             final CompletableFuture<Void> jobMasterServiceTerminationFuture =
                     jobMasterService.closeAsync();
-
             jobMasterService = null;
 
             return jobMasterServiceTerminationFuture;

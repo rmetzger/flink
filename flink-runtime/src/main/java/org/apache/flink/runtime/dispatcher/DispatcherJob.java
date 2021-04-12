@@ -225,7 +225,7 @@ public final class DispatcherJob implements AutoCloseableAsync, JobManagerStatus
     public CompletableFuture<ExecutionGraphInfo> requestJob(Time timeout) {
         synchronized (lock) {
             if (isJobMasterGatewayAvailable()) {
-                if (jobResultFuture.isDone()) { // job is not running anymore (init failed)
+                if (jobResultFuture.isDone()) { // job is not running anymore
                     return jobResultFuture.thenApply(DispatcherJobResult::getExecutionGraphInfo);
                 }
                 return getJobMasterGateway()
@@ -249,6 +249,7 @@ public final class DispatcherJob implements AutoCloseableAsync, JobManagerStatus
      *
      * @return the {@link JobMasterGateway}. The future will complete exceptionally if the
      *     JobManagerRunner initialization failed.
+     * @throws IllegalStateException is thrown if the job is not initialized
      */
     public CompletableFuture<JobMasterGateway> getJobMasterGateway() {
         synchronized (lock) {

@@ -54,6 +54,7 @@ import javax.annotation.Nonnull;
 import java.time.Duration;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -367,16 +368,17 @@ public class JobManagerRunnerImplTest extends TestLogger {
             LibraryCacheManager.ClassLoaderLease classLoaderLease,
             JobManagerStatusListener jobManagerStatusListener)
             throws Exception {
+        ScheduledExecutorService executor = TestingUtils.defaultExecutor();
         return new JobManagerRunnerImpl(
                 jobGraph,
                 jobMasterServiceFactory,
                 haServices,
                 classLoaderLease,
-                TestingUtils.defaultExecutor(),
+                executor,
                 fatalErrorHandler,
                 System.currentTimeMillis(),
                 jobManagerStatusListener,
-                ComponentMainThreadExecutorServiceAdapter.forMainThread());
+                ComponentMainThreadExecutorServiceAdapter.forSingleThreadExecutor(executor));
     }
 
     private class TestingJobManagerStatusListener implements JobManagerStatusListener {
