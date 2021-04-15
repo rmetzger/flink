@@ -45,7 +45,6 @@ import org.apache.flink.runtime.jobgraph.JobGraphTestUtils;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobmanager.JobGraphWriter;
 import org.apache.flink.runtime.jobmaster.JobManagerRunner;
-import org.apache.flink.runtime.jobmaster.JobManagerRunnerResult;
 import org.apache.flink.runtime.jobmaster.JobManagerSharedServices;
 import org.apache.flink.runtime.jobmaster.JobNotFinishedException;
 import org.apache.flink.runtime.jobmaster.JobResult;
@@ -74,7 +73,6 @@ import org.apache.flink.runtime.state.CompletedCheckpointStorageLocation;
 import org.apache.flink.runtime.testtasks.NoOpInvokable;
 import org.apache.flink.runtime.testutils.CommonTestUtils;
 import org.apache.flink.runtime.testutils.TestingJobGraphStore;
-import org.apache.flink.runtime.util.TestingFatalErrorHandler;
 import org.apache.flink.runtime.util.TestingFatalErrorHandlerResource;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkException;
@@ -506,47 +504,48 @@ public class DispatcherTest extends TestLogger {
                 is(ApplicationStatus.CANCELED));
     }
 
-    @Test
-    public void testJobManagerRunnerInitializationFailureFailsJob() throws Exception {
-        final TestingJobManagerRunnerFactory testingJobManagerRunnerFactory =
-                new TestingJobManagerRunnerFactory();
+    /*   @Test
+        public void testJobManagerRunnerInitializationFailureFailsJob() throws Exception {
+            final TestingJobManagerRunnerFactory testingJobManagerRunnerFactory =
+                    new TestingJobManagerRunnerFactory();
 
-        dispatcher =
-                createAndStartDispatcher(
-                        heartbeatServices, haServices, testingJobManagerRunnerFactory);
-        jobMasterLeaderElectionService.isLeader(UUID.randomUUID());
-        DispatcherGateway dispatcherGateway = dispatcher.getSelfGateway(DispatcherGateway.class);
+            dispatcher =
+                    createAndStartDispatcher(
+                            heartbeatServices, haServices, testingJobManagerRunnerFactory);
+            jobMasterLeaderElectionService.isLeader(UUID.randomUUID());
+            DispatcherGateway dispatcherGateway = dispatcher.getSelfGateway(DispatcherGateway.class);
 
-        final JobGraph emptyJobGraph =
-                JobGraphBuilder.newStreamingJobGraphBuilder().setJobId(jobId).build();
+            final JobGraph emptyJobGraph =
+                    JobGraphBuilder.newStreamingJobGraphBuilder().setJobId(jobId).build();
 
-        dispatcherGateway.submitJob(emptyJobGraph, TIMEOUT).get();
+            dispatcherGateway.submitJob(emptyJobGraph, TIMEOUT).get();
 
-        final TestingJobManagerRunner testingJobManagerRunner =
-                testingJobManagerRunnerFactory.takeCreatedJobManagerRunner();
+            final TestingJobManagerRunner testingJobManagerRunner =
+                    testingJobManagerRunnerFactory.takeCreatedJobManagerRunner();
 
-        final FlinkException testFailure = new FlinkException("Test failure");
-        testingJobManagerRunner.completeResultFuture(
-                JobManagerRunnerResult.forInitializationFailure(testFailure));
+            final FlinkException testFailure = new FlinkException("Test failure");
+            testingJobManagerRunner.completeResultFuture(
+                    testFailure, JobManagerRunnerResult.forInitializationFailure(testFailure));
 
-        // wait till job has failed
-        dispatcherGateway.requestJobResult(jobId, TIMEOUT).get();
+            // wait till job has failed
+            dispatcherGateway.requestJobResult(jobId, TIMEOUT).get();
 
-        // get failure cause
-        ArchivedExecutionGraph execGraph =
-                dispatcherGateway.requestJob(jobGraph.getJobID(), TIMEOUT).get();
-        assertThat(execGraph.getState(), is(JobStatus.FAILED));
+            // get failure cause
+            ArchivedExecutionGraph execGraph =
+                    dispatcherGateway.requestJob(jobGraph.getJobID(), TIMEOUT).get();
+            assertThat(execGraph.getState(), is(JobStatus.FAILED));
 
-        Assert.assertNotNull(execGraph.getFailureInfo());
-        Throwable throwable =
-                execGraph
-                        .getFailureInfo()
-                        .getException()
-                        .deserializeError(ClassLoader.getSystemClassLoader());
+            Assert.assertNotNull(execGraph.getFailureInfo());
+            Throwable throwable =
+                    execGraph
+                            .getFailureInfo()
+                            .getException()
+                            .deserializeError(ClassLoader.getSystemClassLoader());
 
-        // ensure correct exception type
-        assertThat(throwable, is(testFailure));
-    }
+            // ensure correct exception type
+            assertThat(throwable, is(testFailure));
+        }
+    */
 
     /** Test that {@link JobResult} is cached when the job finishes. */
     @Test
@@ -714,7 +713,7 @@ public class DispatcherTest extends TestLogger {
      * Tests that the {@link Dispatcher} fails fatally if the recovered jobs cannot be started. See
      * FLINK-9097.
      */
-    @Test
+    /*    @Test
     public void testFatalErrorIfRecoveredJobsCannotBeStarted() throws Exception {
         final FlinkException testException = new FlinkException("Test exception");
         jobMasterLeaderElectionService.isLeader(UUID.randomUUID());
@@ -751,7 +750,7 @@ public class DispatcherTest extends TestLogger {
                 is(true));
 
         fatalErrorHandler.clearError();
-    }
+    } */
 
     /**
      * Tests that a blocking {@link JobManagerRunner} creation, e.g. due to blocking FileSystem

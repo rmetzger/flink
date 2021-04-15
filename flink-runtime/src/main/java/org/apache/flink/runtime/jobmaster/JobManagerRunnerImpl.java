@@ -337,7 +337,8 @@ public class JobManagerRunnerImpl
 
                             classLoaderLease.release();
 
-                            resultFuture.complete(JobManagerRunnerResult.forJobNotFinished());
+                            resultFuture.completeExceptionally(
+                                    new JobNotFinishedException(jobGraph.getJobID()));
 
                             if (throwable != null) {
                                 terminationFuture.completeExceptionally(
@@ -369,7 +370,7 @@ public class JobManagerRunnerImpl
     /** Job completion notification triggered by self. */
     @Override
     public void jobFinishedByOther() {
-        resultFuture.complete(JobManagerRunnerResult.forJobNotFinished());
+        resultFuture.completeExceptionally(new JobNotFinishedException(jobGraph.getJobID()));
     }
 
     @Override
@@ -507,11 +508,13 @@ public class JobManagerRunnerImpl
                                     }
                                 }
                             });
-        } catch (Exception e) {
+        } catch (Exception initializationError) {
             resultFuture.complete(
                     JobManagerRunnerResult.forInitializationFailure(
                             new JobInitializationException(
-                                    jobGraph.getJobID(), "Could not start the JobMaster.", e)));
+                                    jobGraph.getJobID(),
+                                    "Could not start the JobMaster.",
+                                    initializationError)));
         }
     }
 

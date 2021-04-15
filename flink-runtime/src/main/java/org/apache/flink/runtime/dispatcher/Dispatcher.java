@@ -414,7 +414,10 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
 
                                     if (jobManagerRunnerResult != null) {
                                         return handleJobManagerRunnerResult(
-                                                jobId, jobManagerRunnerResult, executionType);
+                                                jobGraph,
+                                                initializationTimestamp,
+                                                jobManagerRunnerResult,
+                                                executionType);
                                     } else {
                                         return jobManagerRunnerFailed(jobId, throwable);
                                     }
@@ -431,12 +434,25 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
     }
 
     private CleanupJobState handleJobManagerRunnerResult(
-            JobID jobId,
+            JobGraph jobGraph,
+            long initializationTimestamp,
             JobManagerRunnerResult jobManagerRunnerResult,
             ExecutionType executionType) {
-        if (jobManagerRunnerResult.isInitializationFailure()
-                && executionType == ExecutionType.RECOVERY) {
-            return jobManagerRunnerFailed(jobId, jobManagerRunnerResult.getInitializationFailure());
+        if (jobManagerRunnerResult.isInitializationFailure()) {
+            if (executionType == ExecutionType.RECOVERY) {
+                return jobManagerRunnerFailed(
+                        jobGraph.getJobID(), jobManagerRunnerResult.getInitializationFailure());
+            } else {
+                final ArchivedExecutionGraph archivedExecutionGraph =
+                        ArchivedExecutionGraph.createFromInitializingJob(
+                                jobGraph.getJobID(),
+                                jobGraph.getName(),
+                                JobStatus.FAILED,
+                                jobManagerRunnerResult.getInitializationFailure(),
+                                initializationTimestamp);
+                return jobReachedGloballyTerminalState(
+                        new ExecutionGraphInfo(archivedExecutionGraph));
+            }
         } else {
             return jobReachedGloballyTerminalState(jobManagerRunnerResult.getExecutionGraphInfo());
         }

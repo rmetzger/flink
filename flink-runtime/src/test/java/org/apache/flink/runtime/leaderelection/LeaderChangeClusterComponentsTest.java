@@ -113,6 +113,7 @@ public class LeaderChangeClusterComponentsTest extends TestLogger {
             jobResultFuture.get();
             fail("Expected JobNotFinishedException");
         } catch (ExecutionException ee) {
+            log.info("caught", ee);
             assertThat(
                     ExceptionUtils.findThrowable(ee, JobNotFinishedException.class).isPresent(),
                     is(true));
