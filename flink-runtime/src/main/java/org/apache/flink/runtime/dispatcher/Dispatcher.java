@@ -889,16 +889,13 @@ public abstract class Dispatcher extends PermanentlyFencedRpcEndpoint<Dispatcher
         if (job == null) {
             return FutureUtils.completedExceptionally(new FlinkJobNotFoundException(jobId));
         }
-        /*
-        TODO: decide what makes sense here later (depending on how JobManagerRunnerImpl is handling stuff.
-        Need to make sure that we are not waiting on the leader future here
 
         if (!job.isInitialized()) {
             return FutureUtils.completedExceptionally(
                     new UnavailableDispatcherOperationException(
                             "Unable to get JobMasterGateway for initializing job. "
                                     + "The requested operation is not available while the JobManager is initializing."));
-        } */
+        }
         return job.getJobMasterGateway();
     }
 

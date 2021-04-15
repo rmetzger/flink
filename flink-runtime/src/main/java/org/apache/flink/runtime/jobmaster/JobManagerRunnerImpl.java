@@ -193,8 +193,8 @@ public class JobManagerRunnerImpl
     public CompletableFuture<Acknowledge> cancel(Time timeout) {
         synchronized (jobStatusLock) {
             if (jobStatus == JobManagerRunnerJobStatus.JOBMASTER_INITIALIZED) {
-                return getJobMasterGateway()
-                        .thenCompose(jobMasterGateway -> jobMasterGateway.cancel(timeout));
+                return leaderGatewayFuture.thenCompose(
+                        jobMasterGateway -> jobMasterGateway.cancel(timeout));
             } else {
                 log.info(
                         "Cancellation during initialization requested for job {}. Job will be cancelled once JobManager has been initialized.",
@@ -208,7 +208,7 @@ public class JobManagerRunnerImpl
                         (ignored, cancelThrowable) -> {
                             if (cancelThrowable != null) {
                                 log.warn(
-                                        "Cancellation of job {} failed",
+                                        "Cancellation of job {} after initialization failed",
                                         jobGraph.getJobID(),
                                         cancelThrowable);
                             }
@@ -245,10 +245,10 @@ public class JobManagerRunnerImpl
                     return resultFuture.thenApply(JobManagerRunnerResult::getExecutionGraphInfo);
                 }
                 // job is running
-                return getJobMasterGateway()
-                        .thenCompose(jobMasterGateway -> jobMasterGateway.requestJob(timeout));
+                return leaderGatewayFuture.thenCompose(
+                        jobMasterGateway -> jobMasterGateway.requestJob(timeout));
             } else {
-                checkState(this.jobStatus.isInitializing());
+                checkState(jobStatus.isInitializing());
                 return CompletableFuture.completedFuture(
                         new ExecutionGraphInfo(
                                 ArchivedExecutionGraph.createFromInitializingJob(
@@ -261,13 +261,19 @@ public class JobManagerRunnerImpl
         }
     }
 
+    @Override
+    public boolean isInitialized() {
+        synchronized (jobStatusLock) {
+            return jobStatus == JobManagerRunnerJobStatus.JOBMASTER_INITIALIZED;
+        }
+    }
+
     private enum JobManagerRunnerJobStatus {
         // We are waiting for the JobMaster to be initialized
         INITIALIZING(JobStatus.INITIALIZING, true),
-        // JobManagerRunner is initialized (this includes initialization failures)
+        // JobMaster is initialized (this includes initialization failures)
         JOBMASTER_INITIALIZED(null, false),
-        // waiting for cancellation. We stay in this status until the job result future completed,
-        // then we consider the JobManager to be initialized.
+        // waiting for cancellation during initialization
         INITIALIZING_CANCELLING(JobStatus.CANCELLING, true);
 
         @Nullable private final JobStatus jobStatus;
@@ -472,7 +478,9 @@ public class JobManagerRunnerImpl
         startJobMasterServiceSafely(leaderSessionId);
 
         synchronized (jobStatusLock) {
-            checkState(jobStatus.isInitializing(), "Can only complete initialization if ");
+            checkState(
+                    jobStatus.isInitializing(),
+                    "Can only complete initialization in initializing state");
             confirmLeaderSessionIdIfStillLeader(jobMasterService, leaderSessionId);
             jobStatus = JobManagerRunnerJobStatus.JOBMASTER_INITIALIZED;
         }
@@ -480,7 +488,6 @@ public class JobManagerRunnerImpl
 
     @GuardedBy("leadershipOperationsLock")
     private void startJobMasterServiceSafely(UUID leaderSessionId) {
-
         try {
             // We assume this operation to be potentially long-running (thus it can not block the
             // JobManager main thread on it)
@@ -579,13 +586,12 @@ public class JobManagerRunnerImpl
         }
 
         if (jobMasterService != null) {
-            log.info(
-                    "JobManager for job {} ({}) at {} was revoked leadership.",
-                    jobGraph.getName(),
-                    jobGraph.getJobID(),
-                    jobMasterService.getAddress());
-
             synchronized (jobStatusLock) {
+                log.info(
+                        "JobManager for job {} ({}) at {} was revoked leadership.",
+                        jobGraph.getName(),
+                        jobGraph.getJobID(),
+                        jobMasterService.getAddress());
                 setNewLeaderGatewayFuture();
 
                 final CompletableFuture<Void> jobMasterServiceTerminationFuture =

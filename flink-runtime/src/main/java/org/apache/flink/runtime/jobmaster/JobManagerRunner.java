@@ -68,4 +68,6 @@ public interface JobManagerRunner extends AutoCloseableAsync {
     CompletableFuture<JobDetails> requestJobDetails(Time timeout);
 
     CompletableFuture<ExecutionGraphInfo> requestJob(Time timeout);
+
+    boolean isInitialized();
 }

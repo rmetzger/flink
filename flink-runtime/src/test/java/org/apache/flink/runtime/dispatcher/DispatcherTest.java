@@ -45,6 +45,7 @@ import org.apache.flink.runtime.jobgraph.JobGraphTestUtils;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobmanager.JobGraphWriter;
 import org.apache.flink.runtime.jobmaster.JobManagerRunner;
+import org.apache.flink.runtime.jobmaster.JobManagerRunnerResult;
 import org.apache.flink.runtime.jobmaster.JobManagerSharedServices;
 import org.apache.flink.runtime.jobmaster.JobNotFinishedException;
 import org.apache.flink.runtime.jobmaster.JobResult;
@@ -73,6 +74,7 @@ import org.apache.flink.runtime.state.CompletedCheckpointStorageLocation;
 import org.apache.flink.runtime.testtasks.NoOpInvokable;
 import org.apache.flink.runtime.testutils.CommonTestUtils;
 import org.apache.flink.runtime.testutils.TestingJobGraphStore;
+import org.apache.flink.runtime.util.TestingFatalErrorHandler;
 import org.apache.flink.runtime.util.TestingFatalErrorHandlerResource;
 import org.apache.flink.util.ExceptionUtils;
 import org.apache.flink.util.FlinkException;
@@ -86,6 +88,7 @@ import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -115,7 +118,6 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.instanceOf;
@@ -390,6 +392,7 @@ public class DispatcherTest extends TestLogger {
         }
     }
 
+    @Ignore("Test uses blocking dispatcher runner")
     @Test
     public void testNonBlockingJobSubmission() throws Exception {
         final OneShotLatch latch = new OneShotLatch();
@@ -426,6 +429,7 @@ public class DispatcherTest extends TestLogger {
                 5L);
     }
 
+    @Ignore("Test is blocking jobmanager runner, instead of jobmaster creation")
     @Test
     public void testInvalidCallDuringInitialization() throws Exception {
         final OneShotLatch latch = new OneShotLatch();
@@ -713,7 +717,7 @@ public class DispatcherTest extends TestLogger {
      * Tests that the {@link Dispatcher} fails fatally if the recovered jobs cannot be started. See
      * FLINK-9097.
      */
-    /*    @Test
+    @Test
     public void testFatalErrorIfRecoveredJobsCannotBeStarted() throws Exception {
         final FlinkException testException = new FlinkException("Test exception");
         jobMasterLeaderElectionService.isLeader(UUID.randomUUID());
@@ -750,42 +754,6 @@ public class DispatcherTest extends TestLogger {
                 is(true));
 
         fatalErrorHandler.clearError();
-    } */
-
-    /**
-     * Tests that a blocking {@link JobManagerRunner} creation, e.g. due to blocking FileSystem
-     * access, does not block the {@link Dispatcher}.
-     *
-     * <p>See FLINK-10314
-     */
-    @Test
-    public void testBlockingJobManagerRunner() throws Exception {
-        final OneShotLatch jobManagerRunnerCreationLatch = new OneShotLatch();
-        dispatcher =
-                createAndStartDispatcher(
-                        heartbeatServices,
-                        haServices,
-                        new BlockingJobManagerRunnerFactory(jobManagerRunnerCreationLatch::await));
-
-        final DispatcherGateway dispatcherGateway =
-                dispatcher.getSelfGateway(DispatcherGateway.class);
-
-        dispatcherGateway.submitJob(jobGraph, TIMEOUT).get();
-
-        assertThat(
-                dispatcherGateway.requestJobStatus(jobGraph.getJobID(), TIMEOUT).get(),
-                is(JobStatus.INITIALIZING));
-
-        final CompletableFuture<Collection<String>> metricQueryServiceAddressesFuture =
-                dispatcherGateway.requestMetricQueryServiceAddresses(Time.seconds(5L));
-
-        assertThat(metricQueryServiceAddressesFuture.get(), is(empty()));
-
-        assertThat(
-                dispatcherGateway.requestJobStatus(jobGraph.getJobID(), TIMEOUT).get(),
-                is(JobStatus.INITIALIZING));
-
-        jobManagerRunnerCreationLatch.trigger();
     }
 
     /** Tests that a failing {@link JobManagerRunner} will be properly cleaned up. */

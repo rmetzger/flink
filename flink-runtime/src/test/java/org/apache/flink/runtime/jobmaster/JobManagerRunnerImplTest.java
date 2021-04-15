@@ -57,6 +57,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import static org.apache.flink.core.testutils.FlinkMatchers.containsCause;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
@@ -134,7 +135,7 @@ public class JobManagerRunnerImplTest extends TestLogger {
         }
     }
 
-    /* @Test
+    @Test
     public void testJobFinishedByOther() throws Exception {
         final JobManagerRunnerImpl jobManagerRunner = createJobManagerRunner();
 
@@ -148,9 +149,12 @@ public class JobManagerRunnerImplTest extends TestLogger {
 
             jobManagerRunner.jobFinishedByOther();
 
-            final JobManagerRunnerResult jobManagerRunnerResult = resultFuture.get();
-
-            assertTrue(jobManagerRunnerResult.isJobNotFinished());
+            try {
+                resultFuture.get();
+                fail();
+            } catch (Throwable t) {
+                assertThat(t, containsCause(JobNotFinishedException.class));
+            }
         } finally {
             jobManagerRunner.close();
         }
@@ -170,13 +174,16 @@ public class JobManagerRunnerImplTest extends TestLogger {
 
             jobManagerRunner.closeAsync();
 
-            final JobManagerRunnerResult jobManagerRunnerResult = resultFuture.join();
-
-            assertTrue(jobManagerRunnerResult.isJobNotFinished());
+            try {
+                resultFuture.get();
+                fail();
+            } catch (Throwable t) {
+                assertThat(t, containsCause(JobNotFinishedException.class));
+            }
         } finally {
             jobManagerRunner.close();
         }
-    } */
+    }
 
     @Test
     public void testLibraryCacheManagerRegistration() throws Exception {
@@ -290,9 +297,7 @@ public class JobManagerRunnerImplTest extends TestLogger {
         assertTrue(
                 jobManagerRunnerResult.getInitializationFailure()
                         instanceof JobInitializationException);
-        assertThat(
-                jobManagerRunnerResult.getInitializationFailure(),
-                FlinkMatchers.containsCause(testException));
+        assertThat(jobManagerRunnerResult.getInitializationFailure(), containsCause(testException));
     }
 
     @Nonnull

@@ -99,6 +99,11 @@ public class TestingJobManagerRunner implements JobManagerRunner {
     }
 
     @Override
+    public boolean isInitialized() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public CompletableFuture<Void> closeAsync() {
         if (!blockingTermination) {
             terminationFuture.complete(null);
