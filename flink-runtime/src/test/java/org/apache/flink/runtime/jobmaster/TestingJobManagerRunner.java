@@ -19,7 +19,11 @@
 package org.apache.flink.runtime.jobmaster;
 
 import org.apache.flink.api.common.JobID;
+import org.apache.flink.api.common.JobStatus;
+import org.apache.flink.api.common.time.Time;
 import org.apache.flink.core.testutils.OneShotLatch;
+import org.apache.flink.runtime.messages.Acknowledge;
+import org.apache.flink.runtime.messages.webmonitor.JobDetails;
 import org.apache.flink.runtime.scheduler.ExecutionGraphInfo;
 import org.apache.flink.util.Preconditions;
 
@@ -72,6 +76,26 @@ public class TestingJobManagerRunner implements JobManagerRunner {
     @Override
     public JobID getJobID() {
         return jobId;
+    }
+
+    @Override
+    public CompletableFuture<Acknowledge> cancel(Time timeout) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public CompletableFuture<JobStatus> requestJobStatus(Time timeout) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public CompletableFuture<JobDetails> requestJobDetails(Time timeout) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public CompletableFuture<ExecutionGraphInfo> requestJob(Time timeout) {
+        throw new UnsupportedOperationException();
     }
 
     @Override
