@@ -21,6 +21,9 @@ package org.apache.flink.runtime.jobmaster;
 import org.apache.flink.runtime.jobmaster.utils.TestingJobMasterGatewayBuilder;
 import org.apache.flink.util.Preconditions;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -28,6 +31,8 @@ import java.util.concurrent.CompletableFuture;
 
 /** Implementation of the {@link JobMasterService} for testing purposes. */
 public class TestingJobMasterService implements JobMasterService {
+
+    private static final Logger log = LoggerFactory.getLogger(TestingJobMasterService.class);
 
     @Nonnull private final String address;
 
@@ -38,10 +43,16 @@ public class TestingJobMasterService implements JobMasterService {
     private final boolean completeTerminationFutureOnCloseAsync;
 
     public TestingJobMasterService(
-            @Nonnull String address, @Nullable CompletableFuture<Void> terminationFuture) {
+            @Nonnull String address,
+            @Nullable CompletableFuture<Void> terminationFuture,
+            @Nullable JobMasterGateway gateway) {
         this.address = address;
 
-        jobMasterGateway = new TestingJobMasterGatewayBuilder().build();
+        if (gateway == null) {
+            jobMasterGateway = new TestingJobMasterGatewayBuilder().build();
+        } else {
+            jobMasterGateway = gateway;
+        }
 
         if (terminationFuture == null) {
             this.terminationFuture = new CompletableFuture<>();
@@ -52,8 +63,12 @@ public class TestingJobMasterService implements JobMasterService {
         }
     }
 
+    public TestingJobMasterService(JobMasterGateway gateway) {
+        this("localhost", null, gateway);
+    }
+
     public TestingJobMasterService() {
-        this("localhost", null);
+        this("localhost", null, null);
     }
 
     @Override
@@ -78,7 +93,10 @@ public class TestingJobMasterService implements JobMasterService {
         if (completeTerminationFutureOnCloseAsync) {
             terminationFuture.complete(null);
         }
-
         return terminationFuture;
+    }
+
+    public boolean isClosed() {
+        return terminationFuture.isDone();
     }
 }

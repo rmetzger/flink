@@ -210,20 +210,25 @@ public class JobManagerRunnerImpl
                         new FlinkException("JobMaster has been shut down.");
                 leaderGatewayFuture.completeExceptionally(shutdownException);
 
-                final CompletableFuture<Void> jobManagerTerminationFuture;
-
-                if (jobMasterService == null) {
-                    jobManagerTerminationFuture = FutureUtils.completedVoidFuture();
-                } else {
-                    jobManagerTerminationFuture = jobMasterService.closeAsync();
-                }
-
-                jobManagerTerminationFuture.whenComplete(
-                        (Void ignored, Throwable throwable) -> onJobManagerTermination(throwable));
-
-                if (jobStatus == JobManagerRunnerJobStatus.INITIALIZING_CANCELLING) {
+                if (jobStatus == JobManagerRunnerJobStatus.JOBMASTER_INITIALIZED) {
+                    checkState(
+                            jobMasterService != null,
+                            "JobMaster service must be set when Job master is initialized");
+                    FutureUtils.assertNoException(
+                            jobMasterService
+                                    .closeAsync()
+                                    .whenComplete(
+                                            (Void ignored, Throwable throwable) ->
+                                                    onJobManagerTermination(throwable)));
+                } else if (jobStatus == JobManagerRunnerJobStatus.INITIALIZING_CANCELLING) {
                     checkState(cancelFuture != null);
                     cancelFuture.completeExceptionally(shutdownException);
+                } else if (jobStatus == JobManagerRunnerJobStatus.INITIALIZING) {
+                    if (currentLeaderSession == null) {
+                        // no ongoing initialization --> close
+                        onJobManagerTermination(null);
+                    }
+                    // ongoing initialization, we will finish closing once it is done.
                 }
             }
 
