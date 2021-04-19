@@ -220,12 +220,14 @@ public class JobManagerRunnerImpl
                                     .whenComplete(
                                             (Void ignored, Throwable throwable) ->
                                                     onJobManagerTermination(throwable)));
-                } else if (jobStatus == JobManagerRunnerJobStatus.INITIALIZING_CANCELLING) {
-                    checkState(cancelFuture != null);
-                    cancelFuture.completeExceptionally(shutdownException);
-                } else if (jobStatus == JobManagerRunnerJobStatus.INITIALIZING) {
+                } else if (jobStatus.isInitializing()) {
+                    if (jobStatus == JobManagerRunnerJobStatus.INITIALIZING_CANCELLING) {
+                        checkState(cancelFuture != null);
+                        cancelFuture.completeExceptionally(shutdownException);
+                    }
+
                     if (currentLeaderSession == null) {
-                        // no ongoing initialization --> close
+                        // no ongoing JobMaster initialization (waiting for leadership) --> close
                         onJobManagerTermination(null);
                     }
                     // ongoing initialization, we will finish closing once it is done.
