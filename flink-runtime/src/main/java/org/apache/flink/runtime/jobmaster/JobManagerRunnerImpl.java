@@ -112,6 +112,7 @@ public class JobManagerRunnerImpl
 
     // set in state INITIALIZING_CANCELLING
     @Nullable private CompletableFuture<Acknowledge> cancelFuture;
+    @Nullable private Time cancelTimeout;
 
     // ------------------------------------------------------------------------
 
@@ -280,6 +281,7 @@ public class JobManagerRunnerImpl
                         jobGraph.getJobID());
 
                 cancelFuture = new CompletableFuture<>();
+                cancelTimeout = timeout;
                 jobStatus = JobManagerRunnerJobStatus.INITIALIZING_CANCELLING;
                 return cancelFuture;
             }
@@ -512,7 +514,7 @@ public class JobManagerRunnerImpl
                 checkState(cancelFuture != null);
                 // we have a pending cancellation. TODO forward original cancel timeout
                 FutureUtils.forward(
-                        newJobMasterService.getGateway().cancel(Time.seconds(10)), cancelFuture);
+                        newJobMasterService.getGateway().cancel(cancelTimeout), cancelFuture);
             }
 
             jobStatus = JobManagerRunnerJobStatus.JOBMASTER_INITIALIZED;
