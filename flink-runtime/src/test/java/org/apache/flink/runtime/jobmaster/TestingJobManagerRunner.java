@@ -44,6 +44,8 @@ public class TestingJobManagerRunner implements JobManagerRunner {
 
     private final OneShotLatch closeAsyncCalledLatch = new OneShotLatch();
 
+    private JobStatus jobStatus = JobStatus.INITIALIZING;
+
     private TestingJobManagerRunner(
             JobID jobId,
             boolean blockingTermination,
@@ -85,7 +87,7 @@ public class TestingJobManagerRunner implements JobManagerRunner {
 
     @Override
     public CompletableFuture<JobStatus> requestJobStatus(Time timeout) {
-        throw new UnsupportedOperationException();
+        return CompletableFuture.completedFuture(jobStatus);
     }
 
     @Override
@@ -111,6 +113,10 @@ public class TestingJobManagerRunner implements JobManagerRunner {
 
         closeAsyncCalledLatch.trigger();
         return terminationFuture;
+    }
+
+    public void setJobStatus(JobStatus newStatus) {
+        this.jobStatus = newStatus;
     }
 
     public OneShotLatch getCloseAsyncCalledLatch() {
