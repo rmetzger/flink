@@ -54,6 +54,7 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 import java.time.Duration;
 import java.util.UUID;
@@ -472,7 +473,7 @@ public class JobManagerRunnerImplTest extends TestLogger {
                 System.currentTimeMillis());
     }
 
-    private static class BlockingJobMasterServiceFactory implements JobMasterServiceFactory {
+    public static class BlockingJobMasterServiceFactory implements JobMasterServiceFactory {
 
         private final OneShotLatch blocker = new OneShotLatch();
         private final BlockingQueue<TestingJobMasterService> jobMasterServicesQueue =
@@ -480,7 +481,11 @@ public class JobManagerRunnerImplTest extends TestLogger {
         private final Supplier<TestingJobMasterService> testingJobMasterServiceSupplier;
 
         public BlockingJobMasterServiceFactory() {
-            this(TestingJobMasterService::new);
+            this(() -> null);
+        }
+
+        public BlockingJobMasterServiceFactory(@Nullable JobMasterGateway jobMasterGateway) {
+            this(() -> new TestingJobMasterService(null, null, jobMasterGateway));
         }
 
         public BlockingJobMasterServiceFactory(
