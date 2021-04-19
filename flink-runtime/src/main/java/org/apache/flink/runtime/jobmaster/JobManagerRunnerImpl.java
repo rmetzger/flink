@@ -305,7 +305,6 @@ public class JobManagerRunnerImpl
                                         executionGraphInfo.getArchivedExecutionGraph()));
     }
 
-    /** Returns a future completing to the ExecutionGraphInfo of the job. */
     @Override
     public CompletableFuture<ExecutionGraphInfo> requestJob(Time timeout) {
         synchronized (lock) {

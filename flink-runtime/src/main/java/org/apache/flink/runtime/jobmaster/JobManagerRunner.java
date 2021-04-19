@@ -61,13 +61,42 @@ public interface JobManagerRunner extends AutoCloseableAsync {
      */
     JobID getJobID();
 
+    /**
+     * Cancels the currently executed job.
+     *
+     * @param timeout of this operation
+     * @return Future acknowledge of the operation
+     */
     CompletableFuture<Acknowledge> cancel(Time timeout);
 
+    /**
+     * Requests the current job status.
+     *
+     * @param timeout for the rpc call
+     * @return Future containing the current job status
+     */
     CompletableFuture<JobStatus> requestJobStatus(Time timeout);
 
+    /**
+     * Request the details of the executed job.
+     *
+     * @param timeout for the rpc call
+     * @return Future details of the executed job
+     */
     CompletableFuture<JobDetails> requestJobDetails(Time timeout);
 
+    /**
+     * Requests the {@link ExecutionGraphInfo} of the executed job.
+     *
+     * @param timeout for the rpc call
+     * @return Future which is completed with the {@link ExecutionGraphInfo} of the executed job
+     */
     CompletableFuture<ExecutionGraphInfo> requestJob(Time timeout);
 
+    /**
+     * Flag indicating if the JobManagerRunner has been initialized.
+     *
+     * @return true if the JobManagerRunner has been initialized.
+     */
     boolean isInitialized();
 }
