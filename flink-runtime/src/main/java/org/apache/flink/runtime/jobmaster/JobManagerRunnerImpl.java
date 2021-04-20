@@ -465,27 +465,58 @@ public class JobManagerRunnerImpl
         // run blocking JobMaster initialization outside of the lock
         CompletableFuture<JobMasterService> jobMasterStartFuture =
                 CompletableFuture.supplyAsync(
-                        () -> startJobMasterServiceSafely(leaderSessionId), executor);
-
-        return jobMasterStartFuture.thenCompose(
-                (newJobMasterService) -> {
-                    synchronized (lock) {
-                        if (newJobMasterService == null) {
-                            // initialization failed
-                            if (jobStatus == JobManagerRunnerJobStatus.INITIALIZING_CANCELLING) {
-                                checkState(cancelFuture != null);
-                                cancelFuture.completeExceptionally(
-                                        new FlinkException(
-                                                "Cancellation failed because JobMaster initialization failed"));
+                        () -> {
+                            try {
+                                return startJobMasterServiceSafely(leaderSessionId);
+                            } catch (Exception e) {
+                                ExceptionUtils.rethrow(e);
+                                return null;
                             }
-                            jobStatus = JobManagerRunnerJobStatus.JOBMASTER_INITIALIZED;
-                            return CompletableFuture.completedFuture(null);
-                        } else {
-                            return onJobMasterInitializationCompletion(
-                                    newJobMasterService, leaderSessionId);
-                        }
-                    }
-                });
+                        },
+                        executor);
+
+        return jobMasterStartFuture
+                .handle(
+                        (newJobMasterService, initializationError) -> {
+                            if (initializationError != null) {
+                                synchronized (lock) {
+                                    // initialization failed
+                                    if (jobStatus
+                                            == JobManagerRunnerJobStatus.INITIALIZING_CANCELLING) {
+                                        checkState(cancelFuture != null);
+                                        cancelFuture.completeExceptionally(
+                                                new FlinkException(
+                                                        "Cancellation failed because JobMaster initialization failed",
+                                                        initializationError));
+                                    }
+                                    if (shutdown) {
+                                        onJobManagerTermination(null);
+                                    }
+                                    jobStatus = JobManagerRunnerJobStatus.INITIALIZATION_FAILED;
+                                    resultFuture.complete(
+                                            JobManagerRunnerResult.forInitializationFailure(
+                                                    new JobInitializationException(
+                                                            jobGraph.getJobID(),
+                                                            "Could not start the JobMaster.",
+                                                            initializationError)));
+                                }
+                                return null;
+                            } else {
+                                checkState(newJobMasterService != null);
+                                return newJobMasterService;
+                            }
+                        })
+                .thenCompose(
+                        (newJobMasterService) -> {
+                            synchronized (lock) {
+                                if (newJobMasterService != null) {
+                                    return onJobMasterInitializationCompletion(
+                                            newJobMasterService, leaderSessionId);
+                                } else {
+                                    return CompletableFuture.completedFuture(null);
+                                }
+                            }
+                        });
     }
 
     // JobMaster initialization is completed. Ensure proper state and leadership
@@ -528,42 +559,32 @@ public class JobManagerRunnerImpl
     }
 
     @Nullable
-    private JobMasterService startJobMasterServiceSafely(UUID leaderSessionId) {
-        try {
-            // We assume this operation to be potentially long-running (thus it can not block the
-            // JobManager main thread on it)
-            final JobMasterService newJobMasterService =
-                    jobMasterServiceFactory.createJobMasterService(
-                            jobGraph,
-                            new JobMasterId(leaderSessionId),
-                            this,
-                            userCodeClassLoader,
-                            initializationTimestamp);
+    private JobMasterService startJobMasterServiceSafely(UUID leaderSessionId) throws Exception {
+        // We assume this operation to be potentially long-running (thus it can not block the
+        // JobManager main thread on it)
+        final JobMasterService newJobMasterService =
+                jobMasterServiceFactory.createJobMasterService(
+                        jobGraph,
+                        new JobMasterId(leaderSessionId),
+                        this,
+                        userCodeClassLoader,
+                        initializationTimestamp);
 
-            newJobMasterService
-                    .getTerminationFuture()
-                    .whenComplete(
-                            (unused, throwable) -> {
-                                if (throwable != null) {
-                                    synchronized (lock) {
-                                        // check that we are still running and the JobMasterService
-                                        // is still valid
-                                        if (!shutdown && newJobMasterService == jobMasterService) {
-                                            handleJobManagerRunnerError(throwable);
-                                        }
+        newJobMasterService
+                .getTerminationFuture()
+                .whenComplete(
+                        (unused, throwable) -> {
+                            if (throwable != null) {
+                                synchronized (lock) {
+                                    // check that we are still running and the JobMasterService
+                                    // is still valid
+                                    if (!shutdown && newJobMasterService == jobMasterService) {
+                                        handleJobManagerRunnerError(throwable);
                                     }
                                 }
-                            });
-            return newJobMasterService;
-        } catch (Exception initializationError) {
-            resultFuture.complete(
-                    JobManagerRunnerResult.forInitializationFailure(
-                            new JobInitializationException(
-                                    jobGraph.getJobID(),
-                                    "Could not start the JobMaster.",
-                                    initializationError)));
-            return null;
-        }
+                            }
+                        });
+        return newJobMasterService;
     }
 
     private void jobAlreadyDone() {
@@ -671,10 +692,12 @@ public class JobManagerRunnerImpl
     private enum JobManagerRunnerJobStatus {
         // We are waiting for the JobMaster to be initialized
         INITIALIZING(JobStatus.INITIALIZING, true),
-        // JobMaster is initialized (this includes initialization failures)
+        // JobMaster is initialized
         JOBMASTER_INITIALIZED(null, false),
         // waiting for cancellation during initialization
-        INITIALIZING_CANCELLING(JobStatus.CANCELLING, true);
+        INITIALIZING_CANCELLING(JobStatus.CANCELLING, true),
+
+        INITIALIZATION_FAILED(null, false);
 
         @Nullable private final JobStatus jobStatus;
         private final boolean initializing;

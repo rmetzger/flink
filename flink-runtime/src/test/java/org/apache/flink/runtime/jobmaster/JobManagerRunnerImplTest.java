@@ -56,6 +56,7 @@ import org.junit.rules.TemporaryFolder;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import javax.annotation.concurrent.GuardedBy;
 
 import java.time.Duration;
 import java.util.UUID;
@@ -575,6 +576,46 @@ public class JobManagerRunnerImplTest extends TestLogger {
         assertThat(jobManagerRunner.getResultFuture().get().isInitializationFailure(), is(true));
     }
 
+    @Test
+    public void testCloseBeforeInitializationFailure() throws Exception {
+        final BlockingJobMasterServiceFactory blockingJobMasterServiceFactory =
+                new BlockingJobMasterServiceFactory();
+
+        final JobManagerRunner jobManagerRunner =
+                createJobManagerRunner(blockingJobMasterServiceFactory);
+
+        jobManagerRunner.start();
+
+        leaderElectionService.isLeader(UUID.randomUUID());
+
+        blockingJobMasterServiceFactory.waitForBlockingOnInit();
+
+        CompletableFuture<Void> closeFuture = jobManagerRunner.closeAsync();
+
+        blockingJobMasterServiceFactory.failBlockingInitialization();
+        closeFuture.get();
+    }
+
+    @Test
+    public void testCloseAfterInitializationFailure() throws Exception {
+        final BlockingJobMasterServiceFactory blockingJobMasterServiceFactory =
+                new BlockingJobMasterServiceFactory();
+
+        final JobManagerRunner jobManagerRunner =
+                createJobManagerRunner(blockingJobMasterServiceFactory);
+
+        jobManagerRunner.start();
+
+        leaderElectionService.isLeader(UUID.randomUUID());
+
+        blockingJobMasterServiceFactory.waitForBlockingOnInit();
+        blockingJobMasterServiceFactory.failBlockingInitialization();
+        // TODO uncool -- define behavior of cancalled runner in general better
+        Thread.sleep(500);
+        CompletableFuture<Void> closeFuture = jobManagerRunner.closeAsync();
+        closeFuture.get();
+    }
+
     private void assertJobNotFinished(CompletableFuture<JobManagerRunnerResult> resultFuture) {
         try {
             resultFuture.get();
@@ -619,12 +660,18 @@ public class JobManagerRunnerImplTest extends TestLogger {
     }
 
     public static class BlockingJobMasterServiceFactory implements JobMasterServiceFactory {
+        private final Object lock = new Object();
 
         private final OneShotLatch blocker = new OneShotLatch();
+
         private final BlockingQueue<TestingJobMasterService> jobMasterServicesQueue =
                 new ArrayBlockingQueue(1);
+
         private final Supplier<TestingJobMasterService> testingJobMasterServiceSupplier;
+
         private int numberOfJobMasterInstancesCreated = 0;
+
+        @GuardedBy("lock")
         private FlinkException initializationException = null;
 
         public BlockingJobMasterServiceFactory() {
@@ -648,15 +695,18 @@ public class JobManagerRunnerImplTest extends TestLogger {
                 ClassLoader userCodeClassloader,
                 long initializationTimestamp)
                 throws Exception {
+
             TestingJobMasterService service = testingJobMasterServiceSupplier.get();
             jobMasterServicesQueue.offer(service);
 
             blocker.await();
-            if (initializationException != null) {
-                throw initializationException;
+            synchronized (lock) {
+                if (initializationException != null) {
+                    throw initializationException;
+                }
+                numberOfJobMasterInstancesCreated++;
+                return service;
             }
-            numberOfJobMasterInstancesCreated++;
-            return service;
         }
 
         public void unblock() {
@@ -669,16 +719,20 @@ public class JobManagerRunnerImplTest extends TestLogger {
         }
 
         public int getNumberOfJobMasterInstancesCreated() {
-            return numberOfJobMasterInstancesCreated;
+            synchronized (lock) {
+                return numberOfJobMasterInstancesCreated;
+            }
         }
 
         public void failBlockingInitialization() {
-            Preconditions.checkState(
-                    !blocker.isTriggered(),
-                    "This only works before the initialization has been unblocked");
-            this.initializationException =
-                    new FlinkException("Test exception during initialization");
-            unblock();
+            synchronized (lock) {
+                Preconditions.checkState(
+                        !blocker.isTriggered(),
+                        "This only works before the initialization has been unblocked");
+                this.initializationException =
+                        new FlinkException("Test exception during initialization");
+                unblock();
+            }
         }
     }
 }
