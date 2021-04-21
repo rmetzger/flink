@@ -627,7 +627,7 @@ public class JobManagerLeadershipRunnerTest extends TestLogger {
                 System.currentTimeMillis());
     }
 
-    private static class BlockingJobMasterServiceProcessFactory
+    public static class BlockingJobMasterServiceProcessFactory
             implements JobMasterServiceProcessFactory {
         private final Object lock = new Object();
         private final OneShotLatch onProcessCreate = new OneShotLatch();
