@@ -256,7 +256,7 @@ public class JobManagerLeadershipRunnerTest extends TestLogger {
         leaderFuture.get();
     }
 
-    @Ignore
+    @Ignore("The problem is that we are not lisening on the JobMaster termination future")
     @Test
     public void testJobMasterServiceTerminatesUnexpectedlyTriggersFailure() throws Exception {
         final CompletableFuture<Void> terminationFuture = new CompletableFuture<>();
@@ -546,7 +546,9 @@ public class JobManagerLeadershipRunnerTest extends TestLogger {
                 equalTo(2));
     }
 
-    @Ignore
+    @Ignore(
+            "Cancellation currently only completes once we have a valid JobMaster instance. "
+                    + "Since the JobMaster could regain leadership and succeed, this is acceptable behavior --> Remove this test?")
     @Test
     public void testCancellationFailsWhenInitializationFails() throws Exception {
         final BlockingJobMasterServiceProcessFactory blockingJobMasterServiceProcessFactory =
@@ -573,6 +575,7 @@ public class JobManagerLeadershipRunnerTest extends TestLogger {
                 .getJobMasterServiceFuture()
                 .completeExceptionally(new RuntimeException("Init failed"));
 
+        assertThat(jobManagerRunner.getResultFuture().get().isInitializationFailure(), is(true));
         try {
             cancelFuture.get();
             fail();
@@ -581,7 +584,6 @@ public class JobManagerLeadershipRunnerTest extends TestLogger {
                     t,
                     containsMessage("Cancellation failed because JobMaster initialization failed"));
         }
-        assertThat(jobManagerRunner.getResultFuture().get().isInitializationFailure(), is(true));
     }
 
     private void assertJobNotFinished(CompletableFuture<JobManagerRunnerResult> resultFuture)
@@ -667,68 +669,4 @@ public class JobManagerLeadershipRunnerTest extends TestLogger {
             }
         }
     }
-
-    /*  public static class BlockingJobMasterServiceFactory implements JobMasterServiceFactory {
-
-        private final OneShotLatch blocker = new OneShotLatch();
-        private final BlockingQueue<TestingJobMasterService> jobMasterServicesQueue =
-                new ArrayBlockingQueue(1);
-        private final Supplier<TestingJobMasterService> testingJobMasterServiceSupplier;
-        private int numberOfJobMasterInstancesCreated = 0;
-        private FlinkException initializationException = null;
-
-        public BlockingJobMasterServiceFactory() {
-            this((JobMasterGateway) null);
-        }
-
-        public BlockingJobMasterServiceFactory(@Nullable JobMasterGateway jobMasterGateway) {
-            this(() -> new TestingJobMasterService(null, null, jobMasterGateway));
-        }
-
-        public BlockingJobMasterServiceFactory(
-                Supplier<TestingJobMasterService> testingJobMasterServiceSupplier) {
-            this.testingJobMasterServiceSupplier = testingJobMasterServiceSupplier;
-        }
-
-        @Override
-        public JobMasterService createJobMasterService(
-                JobGraph jobGraph,
-                JobMasterId jobMasterId,
-                OnCompletionActions jobCompletionActions,
-                ClassLoader userCodeClassloader,
-                long initializationTimestamp)
-                throws Exception {
-            TestingJobMasterService service = testingJobMasterServiceSupplier.get();
-            jobMasterServicesQueue.offer(service);
-
-            blocker.await();
-            if (initializationException != null) {
-                throw initializationException;
-            }
-            numberOfJobMasterInstancesCreated++;
-            return service;
-        }
-
-        public void unblock() {
-            blocker.trigger();
-        }
-
-        public TestingJobMasterService waitForBlockingOnInit()
-                throws ExecutionException, InterruptedException {
-            return jobMasterServicesQueue.take();
-        }
-
-        public int getNumberOfJobMasterInstancesCreated() {
-            return numberOfJobMasterInstancesCreated;
-        }
-
-        public void failBlockingInitialization() {
-            Preconditions.checkState(
-                    !blocker.isTriggered(),
-                    "This only works before the initialization has been unblocked");
-            this.initializationException =
-                    new FlinkException("Test exception during initialization");
-            unblock();
-        }
-    } */
 }
