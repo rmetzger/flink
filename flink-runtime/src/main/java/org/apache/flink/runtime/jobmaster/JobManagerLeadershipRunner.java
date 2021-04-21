@@ -267,7 +267,7 @@ public class JobManagerLeadershipRunner
     }
 
     @GuardedBy("lock")
-    private void createNewJobMasterProcess(UUID leaderSessionId) throws FlinkException {
+    private void createNewJobMasterProcess(UUID leaderSessionId) throws Exception {
         Preconditions.checkState(jobMasterServiceProcess.closeAsync().isDone());
 
         final RunningJobsRegistry.JobSchedulingStatus jobSchedulingStatus =

@@ -27,7 +27,6 @@ import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobmaster.DefaultSlotPoolServiceSchedulerFactory;
 import org.apache.flink.runtime.jobmaster.JobManagerLeadershipRunner;
 import org.apache.flink.runtime.jobmaster.JobManagerRunner;
-import org.apache.flink.runtime.jobmaster.JobManagerRunnerImpl;
 import org.apache.flink.runtime.jobmaster.JobManagerSharedServices;
 import org.apache.flink.runtime.jobmaster.JobMasterConfiguration;
 import org.apache.flink.runtime.jobmaster.JobMasterServiceProcessFactory;
@@ -39,7 +38,7 @@ import org.apache.flink.runtime.shuffle.ShuffleMaster;
 import org.apache.flink.runtime.shuffle.ShuffleServiceLoader;
 import org.apache.flink.util.Preconditions;
 
-/** Singleton default factory for {@link JobManagerRunnerImpl}. */
+/** Singleton default factory for {@link JobManagerLeadershipRunner}. */
 public enum DefaultJobManagerRunnerFactory implements JobManagerRunnerFactory {
     INSTANCE;
 

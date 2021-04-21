@@ -125,7 +125,8 @@ public class DefaultJobMasterServiceProcessFactory implements JobMasterServicePr
                                 ExceptionUtils.rethrow(e);
                                 return null;
                             }
-                        });
+                        },
+                        jobManagerSharedServices.getScheduledExecutorService());
         return new DefaultJobMasterServiceProcess(jobMasterFuture);
     }
 }
