@@ -65,12 +65,12 @@ public class DefaultJobMasterServiceProcess implements JobMasterServiceProcess {
                 isRunning = false;
 
                 resultFuture.complete(JobManagerRunnerResult.forJobNotFinished());
-                jobMasterGatewayFuture.completeExceptionally(
-                        new FlinkException("Process has been closed."));
 
                 if (isInitializationFailed()) {
                     terminationFuture.complete(null);
                 } else {
+                    jobMasterGatewayFuture.completeExceptionally(
+                            new FlinkException("Process has been closed."));
                     FutureUtils.forward(
                             jobMasterServiceFuture.thenCompose(JobMasterService::closeAsync),
                             terminationFuture);
