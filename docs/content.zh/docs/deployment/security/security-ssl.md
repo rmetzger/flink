@@ -314,7 +314,7 @@ For YARN and Mesos, you can use the tools of Yarn and Mesos to help:
 
   - The easiest way to deploy keystores and truststore is by YARN client's *ship files* option (`-yt`).
     Copy the keystore and truststore files into a local directory (say `deploy-keys/`) and start the YARN session as
-    follows: `flink run -m yarn-cluster -yt deploy-keys/ flinkapp.jar`
+    follows: `flink run --target yarn-session -Dyarn.ship-files=deploy-keys/ flinkapp.jar`
 
   - When deployed using YARN, Flink's web dashboard is accessible through YARN proxy's Tracking URL.
     To ensure that the YARN proxy is able to access Flink's HTTPS URL, you need to configure YARN proxy to accept Flink's SSL certificates.

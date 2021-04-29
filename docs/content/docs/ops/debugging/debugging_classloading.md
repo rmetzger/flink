@@ -71,7 +71,7 @@ behave like standalone sessions: Flink's code is in the Java classpath, plugin c
 
 YARN classloading differs between single job deployments and sessions:
 
-  - When submitting a Flink job/application directly to YARN (via `bin/flink run -m yarn-cluster ...`), dedicated TaskManagers and
+  - When submitting a Flink job/application directly to YARN (via `bin/flink run --target yarn-session ...`), dedicated TaskManagers and
     JobManagers are started for that job. Those JVMs have user code classes in the Java classpath.
     That means that there is *no dynamic classloading* involved in that case for the job.
 

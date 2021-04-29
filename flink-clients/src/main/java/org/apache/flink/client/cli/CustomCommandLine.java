@@ -43,6 +43,15 @@ public interface CustomCommandLine {
     String getId();
 
     /**
+     * Flag indicating if the custom command line is deprecated.
+     *
+     * @return Boolean indicating the deprecation status
+     */
+    default boolean isDeprecated() {
+        return false;
+    }
+
+    /**
      * Adds custom options to the existing run options.
      *
      * @param baseOptions The existing options.

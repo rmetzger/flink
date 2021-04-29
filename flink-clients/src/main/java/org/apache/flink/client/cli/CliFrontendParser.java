@@ -564,6 +564,9 @@ public class CliFrontendParser {
             boolean runOptions) {
         // prints options from all available command-line classes
         for (CustomCommandLine cli : customCommandLines) {
+            if (cli.isDeprecated()) {
+                continue;
+            }
             formatter.setSyntaxPrefix("  Options for " + cli.getId() + " mode:");
             Options customOpts = new Options();
             cli.addGeneralOptions(customOpts);

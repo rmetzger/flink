@@ -28,8 +28,16 @@ import org.apache.flink.yarn.executors.YarnSessionClusterExecutor;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+/**
+ * The yarn-cluster mode is deprecated. Users are advised to use "--target
+ * yarn-session/yarn-per-job/yarn-application".
+ */
+@Deprecated
 abstract class AbstractYarnCli extends AbstractCustomCommandLine {
+    private static final Logger LOG = LoggerFactory.getLogger(AbstractYarnCli.class);
 
     public static final String ID = "yarn-cluster";
 
@@ -41,6 +49,8 @@ abstract class AbstractYarnCli extends AbstractCustomCommandLine {
     protected final Configuration configuration;
 
     protected AbstractYarnCli(Configuration configuration, String shortPrefix, String longPrefix) {
+        LOG.warn(
+                "DEPRECATION WARNING: The Flink project intends to deprecate the '-m yarn-cluster' mode in the near future. Please use the \"--target yarn-session\" (and other yarn-* targets) as documented here: https://ci.apache.org/projects/flink/flink-docs-master/docs/deployment/cli/#selecting-deployment-targets");
         this.configuration = configuration;
         this.applicationId =
                 new Option(
@@ -75,5 +85,10 @@ abstract class AbstractYarnCli extends AbstractCustomCommandLine {
     @Override
     public String getId() {
         return ID;
+    }
+
+    @Override
+    public boolean isDeprecated() {
+        return true;
     }
 }
