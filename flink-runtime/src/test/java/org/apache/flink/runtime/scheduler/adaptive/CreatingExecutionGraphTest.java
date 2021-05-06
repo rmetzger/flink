@@ -33,6 +33,7 @@ import org.junit.Test;
 import javax.annotation.Nullable;
 
 import java.time.Duration;
+import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledFuture;
@@ -134,8 +135,11 @@ public class CreatingExecutionGraphTest extends TestLogger {
                     new CreatingExecutionGraph(
                             context, executionGraphWithvertexParallelismFuture, log);
 
-            final StateTrackingMockExecutionGraph executionGraph =
-                    new StateTrackingMockExecutionGraph();
+            ExecutingTest.MockExecutionJobVertex mockExecutionJobVertex =
+                    new ExecutingTest.MockExecutionJobVertex();
+            ExecutionGraph executionGraph =
+                    new ExecutingTest.MockExecutionGraph(
+                            () -> Collections.singletonList(mockExecutionJobVertex));
 
             context.setTryToAssignSlotsFunction(
                     e -> CreatingExecutionGraph.AssignmentResult.success(e.getExecutionGraph()));
@@ -146,6 +150,8 @@ public class CreatingExecutionGraphTest extends TestLogger {
             executionGraphWithvertexParallelismFuture.complete(
                     CreatingExecutionGraph.ExecutionGraphWithVertexParallelism.create(
                             executionGraph, new TestingVertexParallelism()));
+
+            assertThat(mockExecutionJobVertex.isExecutionDeployed(), is(true));
         }
     }
 

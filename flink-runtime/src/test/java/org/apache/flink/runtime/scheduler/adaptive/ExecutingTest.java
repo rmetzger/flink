@@ -81,23 +81,35 @@ import java.util.function.Supplier;
 import static org.apache.flink.runtime.scheduler.adaptive.WaitingForResourcesTest.assertNonNull;
 import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.junit.Assert.assertThat;
 
 /** Tests for {@link AdaptiveScheduler AdaptiveScheduler's} {@link Executing} state. */
 public class ExecutingTest extends TestLogger {
 
-    @Test
-    public void testExecutionGraphDeploymentOnEnter() throws Exception {
+    // Ensure that we fail if we are entering the Executing state w/o the ExecutionGraph being in
+    // state RUNNING
+    @Test(expected = IllegalStateException.class)
+    public void testIllegalStateExceptionOnNotRunningExecutionGraph() throws Exception {
         try (MockExecutingContext ctx = new MockExecutingContext()) {
-            MockExecutionJobVertex mockExecutionJobVertex = new MockExecutionJobVertex();
-            ExecutionGraph executionGraph =
-                    new MockExecutionGraph(() -> Collections.singletonList(mockExecutionJobVertex));
-            Executing exec =
-                    new ExecutingStateBuilder().setExecutionGraph(executionGraph).build(ctx);
+            ExecutionGraph notRunningExecutionGraph = new StateTrackingMockExecutionGraph();
+            assertThat(notRunningExecutionGraph.getState(), is(not(JobStatus.RUNNING)));
 
-            assertThat(mockExecutionJobVertex.isExecutionDeployed(), is(true));
-            assertThat(executionGraph.getState(), is(JobStatus.RUNNING));
+            final ExecutionGraphHandler executionGraphHandler =
+                    new ExecutionGraphHandler(
+                            notRunningExecutionGraph,
+                            log,
+                            ctx.getMainThreadExecutor(),
+                            ctx.getMainThreadExecutor());
+
+            new Executing(
+                    notRunningExecutionGraph,
+                    executionGraphHandler,
+                    new TestingOperatorCoordinatorHandler(),
+                    log,
+                    ctx,
+                    ClassLoader.getSystemClassLoader());
         }
     }
 
@@ -614,17 +626,13 @@ public class ExecutingTest extends TestLogger {
         }
     }
 
-    private static class MockExecutionGraph extends StateTrackingMockExecutionGraph {
+    static class MockExecutionGraph extends StateTrackingMockExecutionGraph {
         private final boolean updateStateReturnValue;
         private final Supplier<Iterable<ExecutionJobVertex>> getVerticesTopologicallySupplier;
 
         MockExecutionGraph(
                 Supplier<Iterable<ExecutionJobVertex>> getVerticesTopologicallySupplier) {
             this(false, getVerticesTopologicallySupplier);
-        }
-
-        MockExecutionGraph(boolean updateStateReturnValue) {
-            this(updateStateReturnValue, null);
         }
 
         private MockExecutionGraph(

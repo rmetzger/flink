@@ -19,14 +19,11 @@
 package org.apache.flink.runtime.scheduler.adaptive;
 
 import org.apache.flink.api.common.JobStatus;
-import org.apache.flink.runtime.JobException;
 import org.apache.flink.runtime.checkpoint.CheckpointScheduling;
 import org.apache.flink.runtime.checkpoint.CompletedCheckpoint;
 import org.apache.flink.runtime.execution.ExecutionState;
 import org.apache.flink.runtime.executiongraph.ArchivedExecutionGraph;
 import org.apache.flink.runtime.executiongraph.ExecutionGraph;
-import org.apache.flink.runtime.executiongraph.ExecutionJobVertex;
-import org.apache.flink.runtime.executiongraph.ExecutionVertex;
 import org.apache.flink.runtime.executiongraph.TaskExecutionStateTransition;
 import org.apache.flink.runtime.scheduler.ExecutionGraphHandler;
 import org.apache.flink.runtime.scheduler.OperatorCoordinatorHandler;
@@ -59,8 +56,6 @@ class Executing extends StateWithExecutionGraph implements ResourceConsumer {
         super(context, executionGraph, executionGraphHandler, operatorCoordinatorHandler, logger);
         this.context = context;
         this.userCodeClassLoader = userCodeClassLoader;
-
-        deploy();
 
         // check if new resources have come available in the meantime
         context.runIfState(this, this::notifyNewResourcesAvailable, Duration.ZERO);
@@ -123,27 +118,6 @@ class Executing extends StateWithExecutionGraph implements ResourceConsumer {
     @Override
     void onGloballyTerminalState(JobStatus globallyTerminalState) {
         context.goToFinished(ArchivedExecutionGraph.createFrom(getExecutionGraph()));
-    }
-
-    private void deploy() {
-        for (ExecutionJobVertex executionJobVertex :
-                getExecutionGraph().getVerticesTopologically()) {
-            for (ExecutionVertex executionVertex : executionJobVertex.getTaskVertices()) {
-                deploySafely(executionVertex);
-            }
-        }
-    }
-
-    private void deploySafely(ExecutionVertex executionVertex) {
-        try {
-            executionVertex.deploy();
-        } catch (JobException e) {
-            handleDeploymentFailure(executionVertex, e);
-        }
-    }
-
-    private void handleDeploymentFailure(ExecutionVertex executionVertex, JobException e) {
-        executionVertex.markFailed(e);
     }
 
     @Override

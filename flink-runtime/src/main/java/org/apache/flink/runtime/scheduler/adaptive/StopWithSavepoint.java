@@ -101,6 +101,8 @@ class StopWithSavepoint extends StateWithExecutionGraph {
             completeOperationAndGoToFinished(savepoint);
         } else {
             if (throwable != null) {
+                // creating the savepoint has failed but job is still running
+                Preconditions.checkState(getExecutionGraph().getState() == JobStatus.RUNNING);
                 operationFailureCause = throwable;
                 checkpointScheduling.startCheckpointScheduler();
                 context.goToExecuting(
