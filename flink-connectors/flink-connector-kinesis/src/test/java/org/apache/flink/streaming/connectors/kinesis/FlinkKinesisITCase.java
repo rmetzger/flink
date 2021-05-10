@@ -29,6 +29,7 @@ import org.apache.flink.test.util.MiniClusterWithClientResource;
 
 import org.junit.Before;
 import org.junit.ClassRule;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -49,6 +50,7 @@ import static org.hamcrest.Matchers.lessThan;
 import static org.junit.Assert.assertThat;
 
 /** IT cases for using Kinesis consumer/producer based on Kinesalite. */
+@Ignore // FLINK-22067
 public class FlinkKinesisITCase {
     public static final String TEST_STREAM = "test_stream";
 

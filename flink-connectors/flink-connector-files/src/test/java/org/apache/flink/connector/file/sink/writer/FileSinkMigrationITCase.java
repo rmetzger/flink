@@ -49,6 +49,7 @@ import org.apache.flink.util.TestLogger;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.ClassRule;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
@@ -64,6 +65,7 @@ import java.util.concurrent.CountDownLatch;
  * Tests migrating from {@link StreamingFileSink} to {@link FileSink}. It trigger a savepoint for
  * the {@link StreamingFileSink} job and restore the {@link FileSink} job from the savepoint taken.
  */
+@Ignore // FLINK-22067
 public class FileSinkMigrationITCase extends TestLogger {
 
     @ClassRule public static final TemporaryFolder TEMPORARY_FOLDER = new TemporaryFolder();
