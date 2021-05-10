@@ -22,7 +22,10 @@ import org.apache.flink.contrib.streaming.state.RocksDBStateBackend;
 import org.apache.flink.runtime.state.StateBackend;
 import org.apache.flink.runtime.state.memory.MemoryStateBackend;
 
+import org.junit.Ignore;
+
 /** IT Case for reading window state with the memory state backend. */
+@Ignore
 public class RocksDBStateBackendWindowITCase
         extends SavepointWindowReaderITCase<RocksDBStateBackend> {
 

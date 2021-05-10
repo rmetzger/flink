@@ -20,7 +20,10 @@ package org.apache.flink.state.api;
 
 import org.apache.flink.runtime.state.memory.MemoryStateBackend;
 
+import org.junit.Ignore;
+
 /** IT Case for reading window state with the memory state backend. */
+@Ignore
 public class MemoryStateBackendWindowITCase
         extends SavepointWindowReaderITCase<MemoryStateBackend> {
 
