@@ -49,11 +49,13 @@ import org.apache.flink.util.Collector;
 
 import org.hamcrest.Matchers;
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.List;
 
 /** IT Case for reading window operator state. */
+@Ignore
 public abstract class SavepointWindowReaderITCase<B extends StateBackend>
         extends SavepointTestBase {
     private static final String uid = "stateful-operator";

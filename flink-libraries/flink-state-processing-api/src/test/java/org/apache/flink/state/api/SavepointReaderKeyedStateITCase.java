@@ -34,6 +34,7 @@ import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 import org.apache.flink.util.Collector;
 
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.Arrays;
@@ -44,6 +45,7 @@ import java.util.Objects;
 import java.util.Set;
 
 /** IT case for reading state. */
+@Ignore
 public abstract class SavepointReaderKeyedStateITCase<B extends StateBackend>
         extends SavepointTestBase {
     private static final String uid = "stateful-operator";
