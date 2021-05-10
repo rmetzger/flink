@@ -190,8 +190,10 @@ public class JarFileChecker {
                                     final String fileContents;
                                     try {
                                         fileContents =
-                                                Files.readString(path, StandardCharsets.UTF_8)
-                                                        .toLowerCase(Locale.ROOT);
+                                                new String(
+                                                                Files.readAllBytes(path),
+                                                                StandardCharsets.UTF_8)
+                                                        .toLowerCase();
                                     } catch (MalformedInputException mie) {
                                         // binary file
                                         return 0;
