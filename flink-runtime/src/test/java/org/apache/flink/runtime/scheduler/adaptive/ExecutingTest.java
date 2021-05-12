@@ -91,13 +91,17 @@ public class ExecutingTest extends TestLogger {
     @Test
     public void testExecutionGraphDeploymentOnEnter() throws Exception {
         try (MockExecutingContext ctx = new MockExecutingContext()) {
-            MockExecutionJobVertex mockExecutionJobVertex = new MockExecutionJobVertex();
+            MockExecutionJobVertex mockExecutionJobVertex =
+                    new MockExecutionJobVertex(MockExecutionVertex::new);
             ExecutionGraph executionGraph =
                     new MockExecutionGraph(() -> Collections.singletonList(mockExecutionJobVertex));
             Executing exec =
                     new ExecutingStateBuilder().setExecutionGraph(executionGraph).build(ctx);
 
-            assertThat(mockExecutionJobVertex.isDeployCalled(), is(true));
+            assertThat(
+                    ((MockExecutionVertex) mockExecutionJobVertex.getMockExecutionVertex())
+                            .isDeployCalled(),
+                    is(true));
             assertThat(executionGraph.getState(), is(JobStatus.RUNNING));
         }
     }
@@ -105,7 +109,8 @@ public class ExecutingTest extends TestLogger {
     @Test
     public void testNoDeploymentCallOnEnterWhenExpectingRunning() throws Exception {
         try (MockExecutingContext ctx = new MockExecutingContext()) {
-            MockExecutionJobVertex mockExecutionJobVertex = new MockExecutionJobVertex();
+            MockExecutionJobVertex mockExecutionJobVertex =
+                    new MockExecutionJobVertex(MockExecutionVertex::new);
             ExecutionGraph executionGraph =
                     new MockExecutionGraph(() -> Collections.singletonList(mockExecutionJobVertex));
             executionGraph.transitionToRunning();
@@ -118,7 +123,10 @@ public class ExecutingTest extends TestLogger {
                     log,
                     ctx,
                     ClassLoader.getSystemClassLoader());
-            assertThat(mockExecutionJobVertex.isDeployCalled(), is(false));
+            assertThat(
+                    ((MockExecutionVertex) mockExecutionJobVertex.getMockExecutionVertex())
+                            .isDeployCalled(),
+                    is(false));
         }
     }
 
@@ -294,6 +302,23 @@ public class ExecutingTest extends TestLogger {
             exec.updateTaskExecutionState(createFailingStateTransition());
 
             ctx.assertNoStateTransition();
+        }
+    }
+
+    @Test
+    public void testExecutionVertexMarkedAsFailedOnDeploymentFailure() throws Exception {
+        try (MockExecutingContext ctx = new MockExecutingContext()) {
+            MockExecutionJobVertex mejv =
+                    new MockExecutionJobVertex(FailOnDeployMockExecutionVertex::new);
+            ExecutionGraph executionGraph =
+                    new MockExecutionGraph(() -> Collections.singletonList(mejv));
+            Executing exec =
+                    new ExecutingStateBuilder().setExecutionGraph(executionGraph).build(ctx);
+
+            assertThat(
+                    ((FailOnDeployMockExecutionVertex) mejv.getMockExecutionVertex())
+                            .getMarkedFailure(),
+                    is(instanceOf(JobException.class)));
         }
     }
 
@@ -743,9 +768,11 @@ public class ExecutingTest extends TestLogger {
     }
 
     static class MockExecutionJobVertex extends ExecutionJobVertex {
-        private final MockExecutionVertex mockExecutionVertex;
+        private final ExecutionVertex mockExecutionVertex;
 
-        MockExecutionJobVertex() throws JobException {
+        MockExecutionJobVertex(
+                Function<ExecutionJobVertex, ExecutionVertex> executionVertexSupplier)
+                throws JobException {
             super(
                     new MockInternalExecutionGraphAccessor(),
                     new JobVertex("test"),
@@ -754,7 +781,7 @@ public class ExecutingTest extends TestLogger {
                     1L,
                     new DefaultVertexParallelismInfo(1, 1, max -> Optional.empty()),
                     new DefaultSubtaskAttemptNumberStore(Collections.emptyList()));
-            mockExecutionVertex = new MockExecutionVertex(this);
+            mockExecutionVertex = executionVertexSupplier.apply(this);
         }
 
         @Override
@@ -762,12 +789,32 @@ public class ExecutingTest extends TestLogger {
             return new ExecutionVertex[] {mockExecutionVertex};
         }
 
-        public MockExecutionVertex getMockExecutionVertex() {
+        public ExecutionVertex getMockExecutionVertex() {
             return mockExecutionVertex;
         }
+    }
 
-        public boolean isDeployCalled() {
-            return mockExecutionVertex.isDeployCalled();
+    static class FailOnDeployMockExecutionVertex extends ExecutionVertex {
+
+        @Nullable private Throwable markFailed = null;
+
+        public FailOnDeployMockExecutionVertex(ExecutionJobVertex jobVertex) {
+            super(jobVertex, 1, new IntermediateResult[] {}, Time.milliseconds(1L), 1L, 1, 0);
+        }
+
+        @Override
+        public void deploy() throws JobException {
+            throw new JobException("Intentional Test exception");
+        }
+
+        @Override
+        public void markFailed(Throwable t) {
+            markFailed = t;
+        }
+
+        @Nullable
+        public Throwable getMarkedFailure() {
+            return markFailed;
         }
     }
 

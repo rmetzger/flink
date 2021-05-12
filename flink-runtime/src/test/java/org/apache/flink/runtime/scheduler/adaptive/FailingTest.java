@@ -102,7 +102,9 @@ public class FailingTest extends TestLogger {
             StateTrackingMockExecutionGraph meg = new StateTrackingMockExecutionGraph();
             Failing failing = createFailingState(ctx, meg);
             // register execution at EG
-            ExecutingTest.MockExecutionJobVertex ejv = new ExecutingTest.MockExecutionJobVertex();
+            ExecutingTest.MockExecutionJobVertex ejv =
+                    new ExecutingTest.MockExecutionJobVertex(
+                            ExecutingTest.MockExecutionVertex::new);
             TaskExecutionStateTransition update =
                     new TaskExecutionStateTransition(
                             new TaskExecutionState(
