@@ -101,11 +101,10 @@ class StopWithSavepoint extends StateWithExecutionGraph {
             completeOperationAndGoToFinished(savepoint);
         } else {
             if (throwable != null) {
-                // creating the savepoint has failed but job is still running
-                Preconditions.checkState(getExecutionGraph().getState() == JobStatus.RUNNING);
                 operationFailureCause = throwable;
                 checkpointScheduling.startCheckpointScheduler();
                 context.goToExecuting(
+                        Executing.Behavior.EXPECT_RUNNING,
                         getExecutionGraph(),
                         getExecutionGraphHandler(),
                         getOperatorCoordinatorHandler());
@@ -262,12 +261,14 @@ class StopWithSavepoint extends StateWithExecutionGraph {
         /**
          * Transitions into the {@link Executing} state.
          *
+         * @param executingStateBehavior set the behavior of the executing state on entering it
          * @param executionGraph executionGraph to pass to the {@link Executing} state
          * @param executionGraphHandler executionGraphHandler to pass to the {@link Executing} state
          * @param operatorCoordinatorHandler operatorCoordinatorHandler to pass to the {@link
          *     Executing} state
          */
         void goToExecuting(
+                Executing.Behavior executingStateBehavior,
                 ExecutionGraph executionGraph,
                 ExecutionGraphHandler executionGraphHandler,
                 OperatorCoordinatorHandler operatorCoordinatorHandler);

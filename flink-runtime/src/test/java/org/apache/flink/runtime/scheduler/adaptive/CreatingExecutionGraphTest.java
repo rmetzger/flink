@@ -33,7 +33,6 @@ import org.junit.Test;
 import javax.annotation.Nullable;
 
 import java.time.Duration;
-import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledFuture;
@@ -135,23 +134,24 @@ public class CreatingExecutionGraphTest extends TestLogger {
                     new CreatingExecutionGraph(
                             context, executionGraphWithvertexParallelismFuture, log);
 
-            ExecutingTest.MockExecutionJobVertex mockExecutionJobVertex =
-                    new ExecutingTest.MockExecutionJobVertex();
-            ExecutionGraph executionGraph =
-                    new ExecutingTest.MockExecutionGraph(
-                            () -> Collections.singletonList(mockExecutionJobVertex));
+            final StateTrackingMockExecutionGraph executionGraph =
+                    new StateTrackingMockExecutionGraph();
 
             context.setTryToAssignSlotsFunction(
                     e -> CreatingExecutionGraph.AssignmentResult.success(e.getExecutionGraph()));
             context.setExpectedExecuting(
-                    actualExecutionGraph ->
-                            assertThat(actualExecutionGraph, sameInstance(executionGraph)));
+                    executingArguments -> {
+                        assertThat(
+                                executingArguments.getExecutionGraph(),
+                                sameInstance(executionGraph));
+                        assertThat(
+                                executingArguments.getBehavior(),
+                                is(Executing.Behavior.DEPLOY_ON_ENTER));
+                    });
 
             executionGraphWithvertexParallelismFuture.complete(
                     CreatingExecutionGraph.ExecutionGraphWithVertexParallelism.create(
                             executionGraph, new TestingVertexParallelism()));
-
-            assertThat(mockExecutionJobVertex.isExecutionDeployed(), is(true));
         }
     }
 
@@ -161,7 +161,7 @@ public class CreatingExecutionGraphTest extends TestLogger {
                 new StateValidator<>("Finished");
         private final StateValidator<Void> waitingForResourcesStateValidator =
                 new StateValidator<>("WaitingForResources");
-        private final StateValidator<ExecutionGraph> executingStateValidator =
+        private final StateValidator<ExecutingArguments> executingStateValidator =
                 new StateValidator<>("Executing");
 
         private Function<
@@ -180,7 +180,7 @@ public class CreatingExecutionGraphTest extends TestLogger {
             waitingForResourcesStateValidator.expectInput((none) -> {});
         }
 
-        public void setExpectedExecuting(Consumer<ExecutionGraph> asserter) {
+        public void setExpectedExecuting(Consumer<ExecutingArguments> asserter) {
             executingStateValidator.expectInput(asserter);
         }
 
@@ -199,8 +199,10 @@ public class CreatingExecutionGraphTest extends TestLogger {
         }
 
         @Override
-        public void goToExecuting(ExecutionGraph executionGraph) {
-            executingStateValidator.validateInput(executionGraph);
+        public void goToExecuting(
+                Executing.Behavior executingStateBehavior, ExecutionGraph executionGraph) {
+            executingStateValidator.validateInput(
+                    new ExecutingArguments(executingStateBehavior, executionGraph));
             hadStateTransitionHappened = true;
         }
 
@@ -251,6 +253,24 @@ public class CreatingExecutionGraphTest extends TestLogger {
         @Override
         public int getParallelism(JobVertexID jobVertexId) {
             throw new UnsupportedOperationException("Is not supported");
+        }
+    }
+
+    private static final class ExecutingArguments {
+        private final Executing.Behavior behavior;
+        private final ExecutionGraph executionGraph;
+
+        public ExecutingArguments(Executing.Behavior behavior, ExecutionGraph executionGraph) {
+            this.behavior = behavior;
+            this.executionGraph = executionGraph;
+        }
+
+        public Executing.Behavior getBehavior() {
+            return behavior;
+        }
+
+        public ExecutionGraph getExecutionGraph() {
+            return executionGraph;
         }
     }
 }

@@ -19,12 +19,9 @@
 package org.apache.flink.runtime.scheduler.adaptive;
 
 import org.apache.flink.api.common.JobStatus;
-import org.apache.flink.runtime.JobException;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.executiongraph.ArchivedExecutionGraph;
 import org.apache.flink.runtime.executiongraph.ExecutionGraph;
-import org.apache.flink.runtime.executiongraph.ExecutionJobVertex;
-import org.apache.flink.runtime.executiongraph.ExecutionVertex;
 import org.apache.flink.runtime.scheduler.adaptive.allocator.VertexParallelism;
 import org.apache.flink.util.Preconditions;
 
@@ -88,9 +85,8 @@ public class CreatingExecutionGraph implements State {
             if (result.isSuccess()) {
                 log.debug(
                         "Successfully reserved and assigned the required slots for the ExecutionGraph.");
-                final ExecutionGraph executionGraph = result.getExecutionGraph();
-                deployExecutionGraph(executionGraph);
-                context.goToExecuting(executionGraph);
+                context.goToExecuting(
+                        Executing.Behavior.DEPLOY_ON_ENTER, result.getExecutionGraph());
             } else {
                 log.debug(
                         "Failed to reserve and assign the required slots. Waiting for new resources.");
@@ -124,26 +120,6 @@ public class CreatingExecutionGraph implements State {
         context.goToFinished(context.getArchivedExecutionGraph(JobStatus.FAILED, cause));
     }
 
-    private void deployExecutionGraph(ExecutionGraph executionGraph) {
-        for (ExecutionJobVertex executionJobVertex : executionGraph.getVerticesTopologically()) {
-            for (ExecutionVertex executionVertex : executionJobVertex.getTaskVertices()) {
-                deploySafely(executionVertex);
-            }
-        }
-    }
-
-    private void deploySafely(ExecutionVertex executionVertex) {
-        try {
-            executionVertex.deploy();
-        } catch (JobException e) {
-            handleDeploymentFailure(executionVertex, e);
-        }
-    }
-
-    private void handleDeploymentFailure(ExecutionVertex executionVertex, JobException e) {
-        executionVertex.markFailed(e);
-    }
-
     @Override
     public Logger getLogger() {
         return log;
@@ -162,9 +138,11 @@ public class CreatingExecutionGraph implements State {
         /**
          * Transitions into the {@link Executing} state.
          *
+         * @param executingStateBehavior set the behavior of the executing state on entering it
          * @param executionGraph executionGraph which is passed to the {@link Executing} state
          */
-        void goToExecuting(ExecutionGraph executionGraph);
+        void goToExecuting(
+                Executing.Behavior executingStateBehavior, ExecutionGraph executionGraph);
 
         /** Transitions into the {@link WaitingForResources} state. */
         void goToWaitingForResources();

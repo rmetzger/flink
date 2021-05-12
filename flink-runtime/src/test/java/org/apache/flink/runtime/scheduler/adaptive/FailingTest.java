@@ -159,11 +159,10 @@ public class FailingTest extends TestLogger {
     private static class MockFailingContext extends MockStateWithExecutionGraphContext
             implements Failing.Context {
 
-        private final StateValidator<ExecutingTest.ExecutingAndCancellingArguments>
-                cancellingStateValidator = new StateValidator<>("cancelling");
+        private final StateValidator<ExecutingTest.CancellingArguments> cancellingStateValidator =
+                new StateValidator<>("cancelling");
 
-        public void setExpectCanceling(
-                Consumer<ExecutingTest.ExecutingAndCancellingArguments> asserter) {
+        public void setExpectCanceling(Consumer<ExecutingTest.CancellingArguments> asserter) {
             cancellingStateValidator.expectInput(asserter);
         }
 
@@ -173,7 +172,7 @@ public class FailingTest extends TestLogger {
                 ExecutionGraphHandler executionGraphHandler,
                 OperatorCoordinatorHandler operatorCoordinatorHandler) {
             cancellingStateValidator.validateInput(
-                    new ExecutingTest.ExecutingAndCancellingArguments(
+                    new ExecutingTest.CancellingArguments(
                             executionGraph, executionGraphHandler, operatorCoordinatorHandler));
             hadStateTransition = true;
         }

@@ -760,7 +760,8 @@ public class AdaptiveScheduler
     }
 
     @Override
-    public void goToExecuting(ExecutionGraph executionGraph) {
+    public void goToExecuting(
+            Executing.Behavior executingStateBehavior, ExecutionGraph executionGraph) {
         final ExecutionGraphHandler executionGraphHandler =
                 new ExecutionGraphHandler(
                         executionGraph, LOG, ioExecutor, componentMainThreadExecutor);
@@ -771,6 +772,7 @@ public class AdaptiveScheduler
 
         transitionToState(
                 new Executing.Factory(
+                        executingStateBehavior,
                         executionGraph,
                         executionGraphHandler,
                         operatorCoordinatorHandler,
@@ -781,11 +783,13 @@ public class AdaptiveScheduler
 
     @Override
     public void goToExecuting(
+            Executing.Behavior executingStateBehavior,
             ExecutionGraph executionGraph,
             ExecutionGraphHandler executionGraphHandler,
             OperatorCoordinatorHandler operatorCoordinatorHandler) {
         transitionToState(
                 new Executing.Factory(
+                        executingStateBehavior,
                         executionGraph,
                         executionGraphHandler,
                         operatorCoordinatorHandler,

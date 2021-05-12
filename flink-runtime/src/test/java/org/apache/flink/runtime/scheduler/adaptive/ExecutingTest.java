@@ -88,24 +88,51 @@ import static org.junit.Assert.assertThat;
 /** Tests for {@link AdaptiveScheduler AdaptiveScheduler's} {@link Executing} state. */
 public class ExecutingTest extends TestLogger {
 
-    // Ensure that we fail if we are entering the Executing state w/o the ExecutionGraph being in
-    // state RUNNING
+    @Test
+    public void testExecutionGraphDeploymentOnEnter() throws Exception {
+        try (MockExecutingContext ctx = new MockExecutingContext()) {
+            MockExecutionJobVertex mockExecutionJobVertex = new MockExecutionJobVertex();
+            ExecutionGraph executionGraph =
+                    new MockExecutionGraph(() -> Collections.singletonList(mockExecutionJobVertex));
+            Executing exec =
+                    new ExecutingStateBuilder().setExecutionGraph(executionGraph).build(ctx);
+
+            assertThat(mockExecutionJobVertex.isDeployCalled(), is(true));
+            assertThat(executionGraph.getState(), is(JobStatus.RUNNING));
+        }
+    }
+
+    @Test
+    public void testNoDeploymentCallOnEnterWhenExpectingRunning() throws Exception {
+        try (MockExecutingContext ctx = new MockExecutingContext()) {
+            MockExecutionJobVertex mockExecutionJobVertex = new MockExecutionJobVertex();
+            ExecutionGraph executionGraph =
+                    new MockExecutionGraph(() -> Collections.singletonList(mockExecutionJobVertex));
+            executionGraph.transitionToRunning();
+
+            new Executing(
+                    Executing.Behavior.EXPECT_RUNNING,
+                    executionGraph,
+                    getExecutionGraphHandler(executionGraph, ctx.getMainThreadExecutor()),
+                    new TestingOperatorCoordinatorHandler(),
+                    log,
+                    ctx,
+                    ClassLoader.getSystemClassLoader());
+            assertThat(mockExecutionJobVertex.isDeployCalled(), is(false));
+        }
+    }
+
     @Test(expected = IllegalStateException.class)
-    public void testIllegalStateExceptionOnNotRunningExecutionGraph() throws Exception {
+    public void testIllegalStateExceptionOnNotRunningExecutionGraphWhenExpectingRunning()
+            throws Exception {
         try (MockExecutingContext ctx = new MockExecutingContext()) {
             ExecutionGraph notRunningExecutionGraph = new StateTrackingMockExecutionGraph();
             assertThat(notRunningExecutionGraph.getState(), is(not(JobStatus.RUNNING)));
 
-            final ExecutionGraphHandler executionGraphHandler =
-                    new ExecutionGraphHandler(
-                            notRunningExecutionGraph,
-                            log,
-                            ctx.getMainThreadExecutor(),
-                            ctx.getMainThreadExecutor());
-
             new Executing(
+                    Executing.Behavior.EXPECT_RUNNING,
                     notRunningExecutionGraph,
-                    executionGraphHandler,
+                    getExecutionGraphHandler(notRunningExecutionGraph, ctx.getMainThreadExecutor()),
                     new TestingOperatorCoordinatorHandler(),
                     log,
                     ctx,
@@ -401,21 +428,22 @@ public class ExecutingTest extends TestLogger {
 
         private Executing build(MockExecutingContext ctx) {
             executionGraph.transitionToRunning();
-            final ExecutionGraphHandler executionGraphHandler =
-                    new ExecutionGraphHandler(
-                            executionGraph,
-                            log,
-                            ctx.getMainThreadExecutor(),
-                            ctx.getMainThreadExecutor());
 
             return new Executing(
+                    Executing.Behavior.DEPLOY_ON_ENTER,
                     executionGraph,
-                    executionGraphHandler,
+                    getExecutionGraphHandler(executionGraph, ctx.getMainThreadExecutor()),
                     operatorCoordinatorHandler,
                     log,
                     ctx,
                     ClassLoader.getSystemClassLoader());
         }
+    }
+
+    private ExecutionGraphHandler getExecutionGraphHandler(
+            ExecutionGraph executionGraph, ComponentMainThreadExecutor mainThreadExecutor) {
+        return new ExecutionGraphHandler(
+                executionGraph, log, mainThreadExecutor, mainThreadExecutor);
     }
 
     private static class MockExecutingContext extends MockStateWithExecutionGraphContext
@@ -425,7 +453,7 @@ public class ExecutingTest extends TestLogger {
                 new StateValidator<>("failing");
         private final StateValidator<RestartingArguments> restartingStateValidator =
                 new StateValidator<>("restarting");
-        private final StateValidator<ExecutingAndCancellingArguments> cancellingStateValidator =
+        private final StateValidator<CancellingArguments> cancellingStateValidator =
                 new StateValidator<>("cancelling");
 
         private Function<Throwable, Executing.FailureResult> howToHandleFailure;
@@ -443,7 +471,7 @@ public class ExecutingTest extends TestLogger {
             restartingStateValidator.expectInput(asserter);
         }
 
-        public void setExpectCancelling(Consumer<ExecutingAndCancellingArguments> asserter) {
+        public void setExpectCancelling(Consumer<CancellingArguments> asserter) {
             cancellingStateValidator.expectInput(asserter);
         }
 
@@ -467,7 +495,7 @@ public class ExecutingTest extends TestLogger {
                 ExecutionGraphHandler executionGraphHandler,
                 OperatorCoordinatorHandler operatorCoordinatorHandler) {
             cancellingStateValidator.validateInput(
-                    new ExecutingAndCancellingArguments(
+                    new CancellingArguments(
                             executionGraph, executionGraphHandler, operatorCoordinatorHandler));
             hadStateTransition = true;
         }
@@ -549,12 +577,30 @@ public class ExecutingTest extends TestLogger {
         }
     }
 
-    static class ExecutingAndCancellingArguments {
+    static class ExecutingArguments extends CancellingArguments {
+
+        private final Executing.Behavior behavior;
+
+        public ExecutingArguments(
+                Executing.Behavior behavior,
+                ExecutionGraph executionGraph,
+                ExecutionGraphHandler executionGraphHandler,
+                OperatorCoordinatorHandler operatorCoordinatorHandle) {
+            super(executionGraph, executionGraphHandler, operatorCoordinatorHandle);
+            this.behavior = behavior;
+        }
+
+        public Executing.Behavior getBehavior() {
+            return behavior;
+        }
+    }
+
+    static class CancellingArguments {
         private final ExecutionGraph executionGraph;
         private final ExecutionGraphHandler executionGraphHandler;
         private final OperatorCoordinatorHandler operatorCoordinatorHandle;
 
-        public ExecutingAndCancellingArguments(
+        public CancellingArguments(
                 ExecutionGraph executionGraph,
                 ExecutionGraphHandler executionGraphHandler,
                 OperatorCoordinatorHandler operatorCoordinatorHandle) {
@@ -576,7 +622,7 @@ public class ExecutingTest extends TestLogger {
         }
     }
 
-    static class StopWithSavepointArguments extends ExecutingAndCancellingArguments {
+    static class StopWithSavepointArguments extends CancellingArguments {
         private final CheckpointScheduling checkpointScheduling;
         private final CompletableFuture<String> savepointFuture;
 
@@ -592,7 +638,7 @@ public class ExecutingTest extends TestLogger {
         }
     }
 
-    static class RestartingArguments extends ExecutingAndCancellingArguments {
+    static class RestartingArguments extends CancellingArguments {
         private final Duration backoffTime;
 
         public RestartingArguments(
@@ -609,7 +655,7 @@ public class ExecutingTest extends TestLogger {
         }
     }
 
-    static class FailingArguments extends ExecutingAndCancellingArguments {
+    static class FailingArguments extends CancellingArguments {
         private final Throwable failureCause;
 
         public FailingArguments(
@@ -720,13 +766,13 @@ public class ExecutingTest extends TestLogger {
             return mockExecutionVertex;
         }
 
-        public boolean isExecutionDeployed() {
-            return mockExecutionVertex.isDeployed();
+        public boolean isDeployCalled() {
+            return mockExecutionVertex.isDeployCalled();
         }
     }
 
     static class MockExecutionVertex extends ExecutionVertex {
-        private boolean deployed = false;
+        private boolean deployCalled = false;
 
         MockExecutionVertex(ExecutionJobVertex jobVertex) {
             super(jobVertex, 1, new IntermediateResult[] {}, Time.milliseconds(1L), 1L, 1, 0);
@@ -734,11 +780,11 @@ public class ExecutingTest extends TestLogger {
 
         @Override
         public void deploy() throws JobException {
-            deployed = true;
+            deployCalled = true;
         }
 
-        public boolean isDeployed() {
-            return deployed;
+        public boolean isDeployCalled() {
+            return deployCalled;
         }
     }
 
