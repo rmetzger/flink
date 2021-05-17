@@ -41,6 +41,7 @@ import javax.annotation.Nullable;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledFuture;
+import java.util.function.Consumer;
 
 /** State which represents a running job with an {@link ExecutionGraph} and assigned slots. */
 class Executing extends StateWithExecutionGraph implements ResourceConsumer {
@@ -68,13 +69,13 @@ class Executing extends StateWithExecutionGraph implements ResourceConsumer {
         super(context, executionGraph, executionGraphHandler, operatorCoordinatorHandler, logger);
         this.context = context;
         this.userCodeClassLoader = userCodeClassLoader;
+        Preconditions.checkState(
+                executionGraph.getState() == JobStatus.RUNNING, "Assuming running execution graph");
 
         if (executingStateBehavior == Behavior.DEPLOY_ON_ENTER) {
-            deploy();
+            onAllExecutionVertexes(this::deploySafely);
         } else if (executingStateBehavior == Behavior.EXPECT_RUNNING) {
-            Preconditions.checkState(
-                    executionGraph.getState() == JobStatus.RUNNING,
-                    "Assuming running execution graph");
+            onAllExecutionVertexes(this::expectRunning);
         } else {
             throw new IllegalStateException(
                     "Unexpected executing state behavior " + executingStateBehavior);
@@ -142,11 +143,11 @@ class Executing extends StateWithExecutionGraph implements ResourceConsumer {
         context.goToFinished(ArchivedExecutionGraph.createFrom(getExecutionGraph()));
     }
 
-    private void deploy() {
+    private void onAllExecutionVertexes(Consumer<ExecutionVertex> operation) {
         for (ExecutionJobVertex executionJobVertex :
                 getExecutionGraph().getVerticesTopologically()) {
             for (ExecutionVertex executionVertex : executionJobVertex.getTaskVertices()) {
-                deploySafely(executionVertex);
+                operation.accept(executionVertex);
             }
         }
     }
@@ -161,6 +162,16 @@ class Executing extends StateWithExecutionGraph implements ResourceConsumer {
 
     private void handleDeploymentFailure(ExecutionVertex executionVertex, JobException e) {
         executionVertex.markFailed(e);
+    }
+
+    private void expectRunning(ExecutionVertex executionVertex) {
+        final ExecutionState state = executionVertex.getExecutionState();
+        Preconditions.checkState(
+                state == ExecutionState.RUNNING,
+                "Expecting execution vertex "
+                        + executionVertex
+                        + " to be in state RUNNING when entering the Executing state, but was in state "
+                        + state);
     }
 
     @Override

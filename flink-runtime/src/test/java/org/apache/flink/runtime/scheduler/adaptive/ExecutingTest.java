@@ -114,6 +114,9 @@ public class ExecutingTest extends TestLogger {
             ExecutionGraph executionGraph =
                     new MockExecutionGraph(() -> Collections.singletonList(mockExecutionJobVertex));
             executionGraph.transitionToRunning();
+            final MockExecutionVertex mockExecutionVertex =
+                    ((MockExecutionVertex) mockExecutionJobVertex.getMockExecutionVertex());
+            mockExecutionVertex.setMockedExecutionState(ExecutionState.RUNNING);
 
             new Executing(
                     Executing.Behavior.EXPECT_RUNNING,
@@ -123,10 +126,7 @@ public class ExecutingTest extends TestLogger {
                     log,
                     ctx,
                     ClassLoader.getSystemClassLoader());
-            assertThat(
-                    ((MockExecutionVertex) mockExecutionJobVertex.getMockExecutionVertex())
-                            .isDeployCalled(),
-                    is(false));
+            assertThat(mockExecutionVertex.isDeployCalled(), is(false));
         }
     }
 
@@ -820,6 +820,7 @@ public class ExecutingTest extends TestLogger {
 
     static class MockExecutionVertex extends ExecutionVertex {
         private boolean deployCalled = false;
+        private ExecutionState mockedExecutionState = ExecutionState.RUNNING;
 
         MockExecutionVertex(ExecutionJobVertex jobVertex) {
             super(jobVertex, 1, new IntermediateResult[] {}, Time.milliseconds(1L), 1L, 1, 0);
@@ -832,6 +833,15 @@ public class ExecutingTest extends TestLogger {
 
         public boolean isDeployCalled() {
             return deployCalled;
+        }
+
+        @Override
+        public ExecutionState getExecutionState() {
+            return mockedExecutionState;
+        }
+
+        public void setMockedExecutionState(ExecutionState mockedExecutionState) {
+            this.mockedExecutionState = mockedExecutionState;
         }
     }
 
