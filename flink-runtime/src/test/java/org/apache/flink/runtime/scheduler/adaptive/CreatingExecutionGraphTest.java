@@ -134,20 +134,11 @@ public class CreatingExecutionGraphTest extends TestLogger {
                     new CreatingExecutionGraph(
                             context, executionGraphWithvertexParallelismFuture, log);
 
-            final StateTrackingMockExecutionGraph executionGraph =
-                    new StateTrackingMockExecutionGraph();
+            final ExecutionGraph executionGraph = new StateTrackingMockExecutionGraph();
 
             context.setTryToAssignSlotsFunction(
                     e -> CreatingExecutionGraph.AssignmentResult.success(e.getExecutionGraph()));
-            context.setExpectedExecuting(
-                    executingArguments -> {
-                        assertThat(
-                                executingArguments.getExecutionGraph(),
-                                sameInstance(executionGraph));
-                        assertThat(
-                                executingArguments.getBehavior(),
-                                is(Executing.Behavior.DEPLOY_ON_ENTER));
-                    });
+            context.setExpectedExecuting(eg -> assertThat(eg, sameInstance(executionGraph)));
 
             executionGraphWithvertexParallelismFuture.complete(
                     CreatingExecutionGraph.ExecutionGraphWithVertexParallelism.create(
@@ -161,7 +152,7 @@ public class CreatingExecutionGraphTest extends TestLogger {
                 new StateValidator<>("Finished");
         private final StateValidator<Void> waitingForResourcesStateValidator =
                 new StateValidator<>("WaitingForResources");
-        private final StateValidator<ExecutingArguments> executingStateValidator =
+        private final StateValidator<ExecutionGraph> executingStateValidator =
                 new StateValidator<>("Executing");
 
         private Function<
@@ -180,7 +171,7 @@ public class CreatingExecutionGraphTest extends TestLogger {
             waitingForResourcesStateValidator.expectInput((none) -> {});
         }
 
-        public void setExpectedExecuting(Consumer<ExecutingArguments> asserter) {
+        public void setExpectedExecuting(Consumer<ExecutionGraph> asserter) {
             executingStateValidator.expectInput(asserter);
         }
 
@@ -199,10 +190,8 @@ public class CreatingExecutionGraphTest extends TestLogger {
         }
 
         @Override
-        public void goToExecuting(
-                Executing.Behavior executingStateBehavior, ExecutionGraph executionGraph) {
-            executingStateValidator.validateInput(
-                    new ExecutingArguments(executingStateBehavior, executionGraph));
+        public void goToExecuting(ExecutionGraph executionGraph) {
+            executingStateValidator.validateInput(executionGraph);
             hadStateTransitionHappened = true;
         }
 
@@ -253,24 +242,6 @@ public class CreatingExecutionGraphTest extends TestLogger {
         @Override
         public int getParallelism(JobVertexID jobVertexId) {
             throw new UnsupportedOperationException("Is not supported");
-        }
-    }
-
-    private static final class ExecutingArguments {
-        private final Executing.Behavior behavior;
-        private final ExecutionGraph executionGraph;
-
-        public ExecutingArguments(Executing.Behavior behavior, ExecutionGraph executionGraph) {
-            this.behavior = behavior;
-            this.executionGraph = executionGraph;
-        }
-
-        public Executing.Behavior getBehavior() {
-            return behavior;
-        }
-
-        public ExecutionGraph getExecutionGraph() {
-            return executionGraph;
         }
     }
 }

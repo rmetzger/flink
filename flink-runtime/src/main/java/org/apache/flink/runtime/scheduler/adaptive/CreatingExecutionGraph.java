@@ -85,8 +85,7 @@ public class CreatingExecutionGraph implements State {
             if (result.isSuccess()) {
                 log.debug(
                         "Successfully reserved and assigned the required slots for the ExecutionGraph.");
-                context.goToExecuting(
-                        Executing.Behavior.DEPLOY_ON_ENTER, result.getExecutionGraph());
+                context.goToExecuting(result.getExecutionGraph());
             } else {
                 log.debug(
                         "Failed to reserve and assign the required slots. Waiting for new resources.");
@@ -138,11 +137,9 @@ public class CreatingExecutionGraph implements State {
         /**
          * Transitions into the {@link Executing} state.
          *
-         * @param executingStateBehavior set the behavior of the executing state on entering it
          * @param executionGraph executionGraph which is passed to the {@link Executing} state
          */
-        void goToExecuting(
-                Executing.Behavior executingStateBehavior, ExecutionGraph executionGraph);
+        void goToExecuting(ExecutionGraph executionGraph);
 
         /** Transitions into the {@link WaitingForResources} state. */
         void goToWaitingForResources();

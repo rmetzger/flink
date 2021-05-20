@@ -93,21 +93,21 @@ public class ExecutingTest extends TestLogger {
         try (MockExecutingContext ctx = new MockExecutingContext()) {
             MockExecutionJobVertex mockExecutionJobVertex =
                     new MockExecutionJobVertex(MockExecutionVertex::new);
+            MockExecutionVertex mockExecutionVertex =
+                    (MockExecutionVertex) mockExecutionJobVertex.getMockExecutionVertex();
+            mockExecutionVertex.setMockedExecutionState(ExecutionState.CREATED);
             ExecutionGraph executionGraph =
                     new MockExecutionGraph(() -> Collections.singletonList(mockExecutionJobVertex));
             Executing exec =
                     new ExecutingStateBuilder().setExecutionGraph(executionGraph).build(ctx);
 
-            assertThat(
-                    ((MockExecutionVertex) mockExecutionJobVertex.getMockExecutionVertex())
-                            .isDeployCalled(),
-                    is(true));
+            assertThat(mockExecutionVertex.isDeployCalled(), is(true));
             assertThat(executionGraph.getState(), is(JobStatus.RUNNING));
         }
     }
 
     @Test
-    public void testNoDeploymentCallOnEnterWhenExpectingRunning() throws Exception {
+    public void testNoDeploymentCallOnEnterWhenVertexRunning() throws Exception {
         try (MockExecutingContext ctx = new MockExecutingContext()) {
             MockExecutionJobVertex mockExecutionJobVertex =
                     new MockExecutionJobVertex(MockExecutionVertex::new);
@@ -119,7 +119,6 @@ public class ExecutingTest extends TestLogger {
             mockExecutionVertex.setMockedExecutionState(ExecutionState.RUNNING);
 
             new Executing(
-                    Executing.Behavior.EXPECT_RUNNING,
                     executionGraph,
                     getExecutionGraphHandler(executionGraph, ctx.getMainThreadExecutor()),
                     new TestingOperatorCoordinatorHandler(),
@@ -131,14 +130,12 @@ public class ExecutingTest extends TestLogger {
     }
 
     @Test(expected = IllegalStateException.class)
-    public void testIllegalStateExceptionOnNotRunningExecutionGraphWhenExpectingRunning()
-            throws Exception {
+    public void testIllegalStateExceptionOnNotRunningExecutionGraph() throws Exception {
         try (MockExecutingContext ctx = new MockExecutingContext()) {
             ExecutionGraph notRunningExecutionGraph = new StateTrackingMockExecutionGraph();
             assertThat(notRunningExecutionGraph.getState(), is(not(JobStatus.RUNNING)));
 
             new Executing(
-                    Executing.Behavior.EXPECT_RUNNING,
                     notRunningExecutionGraph,
                     getExecutionGraphHandler(notRunningExecutionGraph, ctx.getMainThreadExecutor()),
                     new TestingOperatorCoordinatorHandler(),
@@ -455,7 +452,6 @@ public class ExecutingTest extends TestLogger {
             executionGraph.transitionToRunning();
 
             return new Executing(
-                    Executing.Behavior.DEPLOY_ON_ENTER,
                     executionGraph,
                     getExecutionGraphHandler(executionGraph, ctx.getMainThreadExecutor()),
                     operatorCoordinatorHandler,
@@ -599,24 +595,6 @@ public class ExecutingTest extends TestLogger {
             restartingStateValidator.close();
             cancellingStateValidator.close();
             stopWithSavepointValidator.close();
-        }
-    }
-
-    static class ExecutingArguments extends CancellingArguments {
-
-        private final Executing.Behavior behavior;
-
-        public ExecutingArguments(
-                Executing.Behavior behavior,
-                ExecutionGraph executionGraph,
-                ExecutionGraphHandler executionGraphHandler,
-                OperatorCoordinatorHandler operatorCoordinatorHandle) {
-            super(executionGraph, executionGraphHandler, operatorCoordinatorHandle);
-            this.behavior = behavior;
-        }
-
-        public Executing.Behavior getBehavior() {
-            return behavior;
         }
     }
 

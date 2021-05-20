@@ -276,14 +276,10 @@ public class StopWithSavepointTest extends TestLogger {
                 createStopWithSavepoint(ctx, mockStopWithSavepointOperations, savepointFuture);
         ctx.setStopWithSavepoint(sws);
         ctx.setExpectExecuting(
-                executingArguments -> {
-                    assertThat(
-                            executingArguments.getExecutionGraph().getState(),
-                            is(JobStatus.RUNNING));
-                    assertThat(
-                            executingArguments.getBehavior(),
-                            is(Executing.Behavior.EXPECT_RUNNING));
-                });
+                executingArguments ->
+                        assertThat(
+                                executingArguments.getExecutionGraph().getState(),
+                                is(JobStatus.RUNNING)));
 
         savepointFuture.completeExceptionally(new RuntimeException("Test error"));
 
@@ -403,7 +399,7 @@ public class StopWithSavepointTest extends TestLogger {
         private final StateValidator<ExecutingTest.CancellingArguments> cancellingStateValidator =
                 new StateValidator<>("cancelling");
 
-        private final StateValidator<ExecutingTest.ExecutingArguments> executingStateTransition =
+        private final StateValidator<ExecutingTest.CancellingArguments> executingStateTransition =
                 new StateValidator<>("executing");
 
         private StopWithSavepoint state;
@@ -424,7 +420,7 @@ public class StopWithSavepointTest extends TestLogger {
             cancellingStateValidator.expectInput(asserter);
         }
 
-        public void setExpectExecuting(Consumer<ExecutingTest.ExecutingArguments> asserter) {
+        public void setExpectExecuting(Consumer<ExecutingTest.CancellingArguments> asserter) {
             executingStateTransition.expectInput(asserter);
         }
 
@@ -491,17 +487,13 @@ public class StopWithSavepointTest extends TestLogger {
 
         @Override
         public void goToExecuting(
-                Executing.Behavior executingStateBehavior,
                 ExecutionGraph executionGraph,
                 ExecutionGraphHandler executionGraphHandler,
                 OperatorCoordinatorHandler operatorCoordinatorHandler) {
             simulateTransitionToState(Executing.class);
             executingStateTransition.validateInput(
-                    new ExecutingTest.ExecutingArguments(
-                            executingStateBehavior,
-                            executionGraph,
-                            executionGraphHandler,
-                            operatorCoordinatorHandler));
+                    new ExecutingTest.CancellingArguments(
+                            executionGraph, executionGraphHandler, operatorCoordinatorHandler));
             hadStateTransition = true;
         }
 

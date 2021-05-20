@@ -41,7 +41,6 @@ import javax.annotation.Nullable;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledFuture;
-import java.util.function.Consumer;
 
 /** State which represents a running job with an {@link ExecutionGraph} and assigned slots. */
 class Executing extends StateWithExecutionGraph implements ResourceConsumer {
@@ -50,16 +49,7 @@ class Executing extends StateWithExecutionGraph implements ResourceConsumer {
 
     private final ClassLoader userCodeClassLoader;
 
-    /** Determines the behavior of the Executing state on entering it. */
-    enum Behavior {
-        /** deploy job on entering the state. */
-        DEPLOY_ON_ENTER,
-        /** expect an already running job. */
-        EXPECT_RUNNING
-    }
-
     Executing(
-            Behavior executingStateBehavior,
             ExecutionGraph executionGraph,
             ExecutionGraphHandler executionGraphHandler,
             OperatorCoordinatorHandler operatorCoordinatorHandler,
@@ -72,14 +62,8 @@ class Executing extends StateWithExecutionGraph implements ResourceConsumer {
         Preconditions.checkState(
                 executionGraph.getState() == JobStatus.RUNNING, "Assuming running execution graph");
 
-        if (executingStateBehavior == Behavior.DEPLOY_ON_ENTER) {
-            onAllExecutionVertexes(this::deploySafely);
-        } else if (executingStateBehavior == Behavior.EXPECT_RUNNING) {
-            onAllExecutionVertexes(this::expectRunning);
-        } else {
-            throw new IllegalStateException(
-                    "Unexpected executing state behavior " + executingStateBehavior);
-        }
+        deploy();
+
         // check if new resources have come available in the meantime
         context.runIfState(this, this::notifyNewResourcesAvailable, Duration.ZERO);
     }
@@ -143,11 +127,13 @@ class Executing extends StateWithExecutionGraph implements ResourceConsumer {
         context.goToFinished(ArchivedExecutionGraph.createFrom(getExecutionGraph()));
     }
 
-    private void onAllExecutionVertexes(Consumer<ExecutionVertex> operation) {
+    private void deploy() {
         for (ExecutionJobVertex executionJobVertex :
                 getExecutionGraph().getVerticesTopologically()) {
             for (ExecutionVertex executionVertex : executionJobVertex.getTaskVertices()) {
-                operation.accept(executionVertex);
+                if (executionVertex.getExecutionState() != ExecutionState.RUNNING) {
+                    deploySafely(executionVertex);
+                }
             }
         }
     }
@@ -162,16 +148,6 @@ class Executing extends StateWithExecutionGraph implements ResourceConsumer {
 
     private void handleDeploymentFailure(ExecutionVertex executionVertex, JobException e) {
         executionVertex.markFailed(e);
-    }
-
-    private void expectRunning(ExecutionVertex executionVertex) {
-        final ExecutionState state = executionVertex.getExecutionState();
-        Preconditions.checkState(
-                state == ExecutionState.RUNNING,
-                "Expecting execution vertex "
-                        + executionVertex
-                        + " to be in state RUNNING when entering the Executing state, but was in state "
-                        + state);
     }
 
     @Override
@@ -367,17 +343,14 @@ class Executing extends StateWithExecutionGraph implements ResourceConsumer {
         private final ExecutionGraphHandler executionGraphHandler;
         private final OperatorCoordinatorHandler operatorCoordinatorHandler;
         private final ClassLoader userCodeClassLoader;
-        private final Behavior executingStateBehavior;
 
         Factory(
-                Behavior executingStateBehavior,
                 ExecutionGraph executionGraph,
                 ExecutionGraphHandler executionGraphHandler,
                 OperatorCoordinatorHandler operatorCoordinatorHandler,
                 Logger log,
                 Context context,
                 ClassLoader userCodeClassLoader) {
-            this.executingStateBehavior = executingStateBehavior;
             this.context = context;
             this.log = log;
             this.executionGraph = executionGraph;
@@ -392,7 +365,6 @@ class Executing extends StateWithExecutionGraph implements ResourceConsumer {
 
         public Executing getState() {
             return new Executing(
-                    executingStateBehavior,
                     executionGraph,
                     executionGraphHandler,
                     operatorCoordinatorHandler,
