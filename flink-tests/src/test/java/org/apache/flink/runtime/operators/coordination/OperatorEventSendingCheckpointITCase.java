@@ -26,6 +26,7 @@ import org.apache.flink.api.connector.source.lib.NumberSequenceSource;
 import org.apache.flink.api.connector.source.lib.util.IteratorSourceEnumerator;
 import org.apache.flink.api.connector.source.lib.util.IteratorSourceSplit;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.JobManagerOptions;
 import org.apache.flink.runtime.akka.AkkaUtils;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
@@ -416,6 +417,12 @@ public class OperatorEventSendingCheckpointITCase extends TestLogger {
 
     private static class MiniClusterWithRpcIntercepting extends MiniCluster {
 
+        private static final Configuration config = new Configuration();
+
+        static {
+            config.set(JobManagerOptions.SCHEDULER, JobManagerOptions.SchedulerType.Adaptive);
+        }
+
         private boolean localRpcCreated;
 
         public MiniClusterWithRpcIntercepting(final int numSlots) {
@@ -424,6 +431,7 @@ public class OperatorEventSendingCheckpointITCase extends TestLogger {
                             .setRpcServiceSharing(RpcServiceSharing.SHARED)
                             .setNumTaskManagers(1)
                             .setNumSlotsPerTaskManager(numSlots)
+                            .setConfiguration(config)
                             .build());
         }
 
