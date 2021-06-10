@@ -65,6 +65,6 @@ jobs:
     steps:
     - task: UseRubyVersion@0
       inputs:
-        versionSpec: '= 2.5.9'
+        versionSpec: '= 2.5'
         addToPath: true
     - script: ./tools/ci/docs.sh
