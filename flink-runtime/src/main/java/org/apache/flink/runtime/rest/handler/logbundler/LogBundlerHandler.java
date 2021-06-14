@@ -64,6 +64,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -207,7 +208,7 @@ public class LogBundlerHandler
                 getResourceManagerGateway(resourceManagerGatewayRetriever);
         Collection<TaskManagerInfo> taskManagers =
                 resourceManagerGateway.requestTaskManagerInfo(timeout).get();
-        Collection<CompletableFuture<File>> taskManagerLogsFuture =
+        Collection<CompletableFuture<Optional<File>>> taskManagerLogsFuture =
                 new ArrayList<>(taskManagers.size());
         for (TaskManagerInfo taskManagerInfo : taskManagers) {
             taskManagerLogsFuture.add(
@@ -217,12 +218,13 @@ public class LogBundlerHandler
                             .thenApplyAsync(
                                     tmLogBlobKey -> {
                                         try {
-                                            return transientBlobService.getFile(tmLogBlobKey);
+                                            return Optional.of(
+                                                    transientBlobService.getFile(tmLogBlobKey));
                                         } catch (IOException e) {
                                             log.warn(
                                                     "Error while retrieving log from TaskManager",
                                                     e);
-                                            return null;
+                                            return Optional.empty();
                                         }
                                     },
                                     executor));
@@ -231,9 +233,13 @@ public class LogBundlerHandler
                 .thenAccept(
                         taskManagerLogFiles ->
                                 taskManagerLogFiles.forEach(
-                                        taskManagerLogFile ->
-                                                addTaskManagerLogFile(
-                                                        taskManagerLogFile, archiveOutputStream)));
+                                        taskManagerLogFileOptional ->
+                                                taskManagerLogFileOptional.ifPresent(
+                                                        taskManagerLogFile ->
+                                                                addTaskManagerLogFile(
+                                                                        taskManagerLogFile,
+                                                                        archiveOutputStream))))
+                .get();
     }
 
     private void addTaskManagerLogFile(File logFile, ArchiveOutputStream outputStream) {
@@ -246,6 +252,9 @@ public class LogBundlerHandler
 
     private void collectLocalLogs(ArchiveOutputStream archiveOutputStream) throws IOException {
         File[] localLogFiles = localLogDir.listFiles((dir, name) -> name.endsWith(".log"));
+        if (localLogFiles == null || localLogFiles.length == 0) {
+            return;
+        }
         for (File localLogFile : localLogFiles) {
             addArchiveEntry("jobmanager", localLogFile, archiveOutputStream);
         }

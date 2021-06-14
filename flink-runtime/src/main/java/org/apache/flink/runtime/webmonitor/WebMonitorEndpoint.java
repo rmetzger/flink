@@ -851,7 +851,8 @@ public class WebMonitorEndpoint<T extends RestfulGateway> extends RestServerEndp
                         executor,
                         clusterConfiguration,
                         logFileLocation.logDir,
-                        resourceManagerRetriever);
+                        resourceManagerRetriever,
+                        transientBlobService);
 
         handlers.add(Tuple2.of(JobManagerLogFileHeader.getInstance(), jobManagerLogFileHandler));
         handlers.add(
