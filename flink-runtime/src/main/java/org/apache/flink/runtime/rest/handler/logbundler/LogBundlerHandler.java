@@ -22,6 +22,7 @@ import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ConfigurationUtils;
 import org.apache.flink.runtime.blob.TransientBlobService;
+import org.apache.flink.runtime.clusterframework.types.ResourceID;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.resourcemanager.ResourceManagerGateway;
 import org.apache.flink.runtime.rest.handler.AbstractHandler;
@@ -48,8 +49,6 @@ import org.apache.commons.compress.archivers.ArchiveOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.apache.commons.compress.utils.IOUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
@@ -72,10 +71,9 @@ import java.util.concurrent.ScheduledExecutorService;
 import static org.apache.flink.runtime.rest.handler.resourcemanager.AbstractResourceManagerHandler.getResourceManagerGateway;
 import static org.apache.flink.util.Preconditions.checkState;
 
+/** TODOs: - ui change - add tests - open PR :win: */
 public class LogBundlerHandler
         extends AbstractHandler<RestfulGateway, EmptyRequestBody, LogBundlerMessageParameters> {
-
-    private static final Logger LOG = LoggerFactory.getLogger(LogBundlerHandler.class);
 
     private final Object statusLock = new Object();
     private final ScheduledExecutorService executor;
@@ -84,7 +82,7 @@ public class LogBundlerHandler
     private final TransientBlobService transientBlobService;
 
     @GuardedBy("statusLock")
-    private Status status = Status.IDLE;
+    private volatile Status status = Status.IDLE;
 
     private final GatewayRetriever<ResourceManagerGateway> resourceManagerGatewayRetriever;
 
@@ -129,10 +127,11 @@ public class LogBundlerHandler
             HandlerRequest<EmptyRequestBody, LogBundlerMessageParameters> handlerRequest,
             RestfulGateway gateway)
             throws RestHandlerException {
-        synchronized (statusLock) {
-            List<String> queryParams =
-                    handlerRequest.getQueryParameter(LogBundlerActionQueryParameter.class);
-            if (!queryParams.isEmpty()) {
+
+        List<String> queryParams =
+                handlerRequest.getQueryParameter(LogBundlerActionQueryParameter.class);
+        if (!queryParams.isEmpty()) {
+            synchronized (statusLock) {
                 final String action = queryParams.get(0);
                 if ("download".equals(action)) {
                     if (status != Status.BUNDLE_READY) {
@@ -142,8 +141,9 @@ public class LogBundlerHandler
                     }
                     try {
                         HandlerUtils.transferFile(ctx, bundlerFile, httpRequest);
+                        return CompletableFuture.completedFuture(null);
                     } catch (FlinkException e) {
-                        LOG.warn("Error while transferring file", e);
+                        log.warn("Error while transferring file", e);
                     }
                 } else if ("trigger".equals(action)) {
                     if (status == Status.PROCESSING) {
@@ -155,17 +155,18 @@ public class LogBundlerHandler
                     status = Status.PROCESSING;
                     executor.execute(this::collectAndCompressLogs);
                 } else {
-                    LOG.warn("Unknown action passed: '{}'", action);
+                    log.warn("Unknown action passed: '{}'", action);
                 }
             }
-
-            return HandlerUtils.sendResponse(
-                    ctx,
-                    httpRequest,
-                    new LogBundlerStatus(status),
-                    HttpResponseStatus.OK,
-                    responseHeaders);
         }
+
+        // access status outside of lock to respond to status queries while processing.
+        return HandlerUtils.sendResponse(
+                ctx,
+                httpRequest,
+                new LogBundlerStatus(status),
+                HttpResponseStatus.OK,
+                responseHeaders);
     }
 
     private void collectAndCompressLogs() {
@@ -173,31 +174,26 @@ public class LogBundlerHandler
             try {
                 checkState(status == Status.PROCESSING);
 
-                collectLogs();
+                try (OutputStream fo =
+                                Files.newOutputStream(
+                                        bundlerFile.toPath(),
+                                        StandardOpenOption.CREATE,
+                                        StandardOpenOption.WRITE,
+                                        StandardOpenOption.TRUNCATE_EXISTING);
+                        OutputStream gzo = new GzipCompressorOutputStream(fo);
+                        ArchiveOutputStream archiveOutputStream = new TarArchiveOutputStream(gzo)) {
+                    collectLocalLogs(archiveOutputStream);
+                    collectTaskManagerLogs(archiveOutputStream);
+                    archiveOutputStream.finish();
+                }
 
                 status = Status.BUNDLE_READY;
             } catch (Throwable throwable) {
                 status = Status.BUNDLE_FAILED;
-                LOG.warn(
+                log.warn(
                         "Error while collecting and compressing logs with the log bundler",
                         throwable);
             }
-        }
-    }
-
-    private void collectLogs()
-            throws IOException, RestHandlerException, ExecutionException, InterruptedException {
-        try (OutputStream fo =
-                        Files.newOutputStream(
-                                bundlerFile.toPath(),
-                                StandardOpenOption.CREATE,
-                                StandardOpenOption.WRITE,
-                                StandardOpenOption.TRUNCATE_EXISTING);
-                OutputStream gzo = new GzipCompressorOutputStream(fo);
-                ArchiveOutputStream archiveOutputStream = new TarArchiveOutputStream(gzo)) {
-            collectLocalLogs(archiveOutputStream);
-            collectTaskManagerLogs(archiveOutputStream);
-            archiveOutputStream.finish();
         }
     }
 
@@ -208,7 +204,7 @@ public class LogBundlerHandler
                 getResourceManagerGateway(resourceManagerGatewayRetriever);
         Collection<TaskManagerInfo> taskManagers =
                 resourceManagerGateway.requestTaskManagerInfo(timeout).get();
-        Collection<CompletableFuture<Optional<File>>> taskManagerLogsFuture =
+        Collection<CompletableFuture<Optional<TaskManagerLogAndId>>> taskManagerLogsFuture =
                 new ArrayList<>(taskManagers.size());
         for (TaskManagerInfo taskManagerInfo : taskManagers) {
             taskManagerLogsFuture.add(
@@ -219,7 +215,10 @@ public class LogBundlerHandler
                                     tmLogBlobKey -> {
                                         try {
                                             return Optional.of(
-                                                    transientBlobService.getFile(tmLogBlobKey));
+                                                    new TaskManagerLogAndId(
+                                                            taskManagerInfo.getResourceId(),
+                                                            transientBlobService.getFile(
+                                                                    tmLogBlobKey)));
                                         } catch (IOException e) {
                                             log.warn(
                                                     "Error while retrieving log from TaskManager",
@@ -242,9 +241,13 @@ public class LogBundlerHandler
                 .get();
     }
 
-    private void addTaskManagerLogFile(File logFile, ArchiveOutputStream outputStream) {
+    private void addTaskManagerLogFile(
+            TaskManagerLogAndId logFile, ArchiveOutputStream outputStream) {
         try {
-            addArchiveEntry("taskmanager", logFile, outputStream);
+            addArchiveEntry(
+                    "taskmanager-" + logFile.getTaskManagerId().toString() + ".log",
+                    logFile.getLogFile(),
+                    outputStream);
         } catch (IOException e) {
             log.warn("Error while adding TaskManager log file to archive", e);
         }
@@ -256,13 +259,14 @@ public class LogBundlerHandler
             return;
         }
         for (File localLogFile : localLogFiles) {
-            addArchiveEntry("jobmanager", localLogFile, archiveOutputStream);
+            addArchiveEntry(localLogFile.getName(), localLogFile, archiveOutputStream);
         }
     }
 
-    private void addArchiveEntry(String type, File file, ArchiveOutputStream outputStream)
+    private void addArchiveEntry(String entryName, File file, ArchiveOutputStream outputStream)
             throws IOException {
-        ArchiveEntry entry = outputStream.createArchiveEntry(file, entryName(type, file));
+        // todo: dedupe entryNames
+        ArchiveEntry entry = outputStream.createArchiveEntry(file, entryName);
         outputStream.putArchiveEntry(entry);
         if (file.isFile()) {
             try (InputStream inputStream = Files.newInputStream(file.toPath())) {
@@ -272,8 +276,21 @@ public class LogBundlerHandler
         outputStream.closeArchiveEntry();
     }
 
-    private String entryName(String type, File localLogFile) {
-        // TODO dedupe file names with filesInBundlerFile
-        return type + "-" + localLogFile.getName();
+    private static class TaskManagerLogAndId {
+        private final ResourceID taskManagerId;
+        private final File logFile;
+
+        public TaskManagerLogAndId(ResourceID taskManagerId, File logFile) {
+            this.taskManagerId = taskManagerId;
+            this.logFile = logFile;
+        }
+
+        public ResourceID getTaskManagerId() {
+            return taskManagerId;
+        }
+
+        public File getLogFile() {
+            return logFile;
+        }
     }
 }
