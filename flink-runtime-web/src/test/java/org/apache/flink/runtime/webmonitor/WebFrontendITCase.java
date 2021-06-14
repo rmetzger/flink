@@ -51,10 +51,12 @@ import org.junit.Assert;
 import org.junit.ClassRule;
 import org.junit.Test;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.Duration;
 import java.util.Collection;
@@ -98,8 +100,11 @@ public class WebFrontendITCase extends TestLogger {
             File logFile = new File(logDir, "jobmanager.log");
             File outFile = new File(logDir, "jobmanager.out");
 
-            Files.createFile(logFile.toPath());
+            byte[] sampleLogFileContents =
+                    "Test log file contents".getBytes(StandardCharsets.UTF_8);
+
             Files.createFile(outFile.toPath());
+            Files.copy(new ByteArrayInputStream(sampleLogFileContents), logFile.toPath());
 
             config.setString(WebOptions.LOG_PATH, logFile.getAbsolutePath());
             config.setString(ConfigConstants.TASK_MANAGER_LOG_PATH_KEY, logFile.getAbsolutePath());
@@ -123,6 +128,12 @@ public class WebFrontendITCase extends TestLogger {
         String fromHTTP =
                 TestBaseUtils.getFromHTTP("http://localhost:" + getRestPort() + "/index.html");
         assertThat(fromHTTP, containsString("Apache Flink Web Dashboard"));
+    }
+
+    @Test
+    public void dev() throws Exception {
+        System.out.println("http://localhost:" + getRestPort() + "/logbundler");
+        Thread.sleep(500000);
     }
 
     private int getRestPort() {
