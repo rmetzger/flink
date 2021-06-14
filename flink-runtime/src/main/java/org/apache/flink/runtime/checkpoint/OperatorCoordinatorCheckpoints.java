@@ -23,6 +23,8 @@ import org.apache.flink.runtime.operators.coordination.OperatorCoordinator;
 import org.apache.flink.runtime.operators.coordination.OperatorInfo;
 import org.apache.flink.runtime.state.memory.ByteStreamStateHandle;
 
+import org.slf4j.LoggerFactory;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
@@ -44,6 +46,8 @@ final class OperatorCoordinatorCheckpoints {
             throws Exception {
 
         final CompletableFuture<byte[]> checkpointFuture = new CompletableFuture<>();
+        LoggerFactory.getLogger(OperatorCoordinatorCheckpoints.class)
+                .info("OperatorCoordinatorCheckpoints.triggerCoordinatorCheckpoint");
         coordinatorContext.checkpointCoordinator(checkpointId, checkpointFuture);
 
         return checkpointFuture.thenApply(
@@ -62,6 +66,8 @@ final class OperatorCoordinatorCheckpoints {
         final Collection<CompletableFuture<CoordinatorSnapshot>> individualSnapshots =
                 new ArrayList<>(coordinators.size());
 
+        LoggerFactory.getLogger("rob")
+                .info("triggerAllCoordinatorCheckpoints.coordinators = " + coordinators);
         for (final OperatorCoordinatorCheckpointContext coordinator : coordinators) {
             final CompletableFuture<CoordinatorSnapshot> checkpointFuture =
                     triggerCoordinatorCheckpoint(coordinator, checkpointId);

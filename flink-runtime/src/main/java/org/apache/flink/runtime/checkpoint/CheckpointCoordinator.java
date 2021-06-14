@@ -1772,6 +1772,7 @@ public class CheckpointCoordinator {
             // make sure all prior timers are cancelled
             stopCheckpointScheduler();
 
+            LOG.info("START CHECKPOINT SCHEDULER");
             periodicScheduling = true;
             currentPeriodicTrigger = scheduleTriggerWithDelay(getRandomInitDelay());
         }
@@ -1779,6 +1780,7 @@ public class CheckpointCoordinator {
 
     public void stopCheckpointScheduler() {
         synchronized (lock) {
+            LOG.info("STOP CHECKPOINT SCHEDULER");
             periodicScheduling = false;
 
             cancelPeriodicTrigger();

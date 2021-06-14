@@ -37,6 +37,8 @@ import org.apache.flink.util.FlinkException;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.IOUtils;
 
+import org.slf4j.LoggerFactory;
+
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -126,6 +128,8 @@ public class DefaultOperatorCoordinatorHandler implements OperatorCoordinatorHan
             throw new FlinkException("No coordinator registered for operator " + operatorId);
         }
 
+        LoggerFactory.getLogger(this.getClass())
+                .info("OperatorCoordinatorHandler forwarding event " + evt);
         try {
             coordinator.handleEventFromOperator(exec.getParallelSubtaskIndex(), evt);
         } catch (Throwable t) {

@@ -26,6 +26,7 @@ import org.apache.flink.api.connector.source.lib.NumberSequenceSource;
 import org.apache.flink.api.connector.source.lib.util.IteratorSourceEnumerator;
 import org.apache.flink.api.connector.source.lib.util.IteratorSourceSplit;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.JobManagerOptions;
 import org.apache.flink.runtime.akka.AkkaUtils;
 import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.executiongraph.ExecutionAttemptID;
@@ -46,7 +47,6 @@ import org.apache.flink.runtime.taskexecutor.TaskExecutorGatewayDecoratorBase;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.util.TestStreamEnvironment;
-import org.apache.flink.testutils.junit.FailsWithAdaptiveScheduler;
 import org.apache.flink.util.SerializedValue;
 import org.apache.flink.util.TestLogger;
 import org.apache.flink.util.function.TriFunction;
@@ -55,7 +55,8 @@ import akka.actor.ActorSystem;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.junit.experimental.categories.Category;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 
@@ -70,9 +71,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.LongStream;
-
-import static org.junit.Assert.assertEquals;
 
 /**
  * A test suite for source enumerator (operator coordinator) for situations where RPC calls for
@@ -85,7 +83,10 @@ public class OperatorEventSendingCheckpointITCase extends TestLogger {
 
     @BeforeClass
     public static void setupMiniClusterAndEnv() throws Exception {
-        flinkCluster = new MiniClusterWithRpcIntercepting(PARALLELISM);
+        Configuration config = new Configuration();
+        config.set(JobManagerOptions.SCHEDULER, JobManagerOptions.SchedulerType.Adaptive);
+        // config.set(JobManagerOptions.EXECUTION_FAILOVER_STRATEGY, "full");
+        flinkCluster = new MiniClusterWithRpcIntercepting(PARALLELISM, config);
         flinkCluster.start();
         TestStreamEnvironment.setAsContext(flinkCluster, PARALLELISM);
     }
@@ -126,7 +127,6 @@ public class OperatorEventSendingCheckpointITCase extends TestLogger {
      * additionally a failure on the reader that triggers recovery.
      */
     @Test
-    @Category(FailsWithAdaptiveScheduler.class) // FLINK-22464
     public void testOperatorEventLostWithReaderFailure() throws Exception {
         final int[] eventsToLose = new int[] {1, 3};
 
@@ -203,7 +203,7 @@ public class OperatorEventSendingCheckpointITCase extends TestLogger {
 
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(1);
-        env.enableCheckpointing(50);
+        env.enableCheckpointing(10);
 
         final DataStream<Long> numbers =
                 env.fromSource(
@@ -212,25 +212,30 @@ public class OperatorEventSendingCheckpointITCase extends TestLogger {
                                 "numbers")
                         .map(
                                 new MapFunction<Long, Long>() {
+                                    private final Logger LOG =
+                                            LoggerFactory.getLogger(this.getClass());
                                     private int num;
 
                                     @Override
                                     public Long map(Long value) throws Exception {
+                                        LOG.info("num={} failAt={} value={}", num, failAt, value);
                                         if (++num > failAt) {
                                             throw new Exception("Artificial intermittent failure.");
                                         }
                                         return value;
                                     }
                                 });
+        env.execute();
 
-        final List<Long> sequence = numbers.executeAndCollect(numElements);
+        // for debugging, disable collection source to avoid noise in the logs
+        /*final List<Long> sequence = numbers.executeAndCollect(numElements);
         // the recovery may change the order of splits, so the sequence might be out-of-order
         sequence.sort(Long::compareTo);
 
         final List<Long> expectedSequence =
                 LongStream.rangeClosed(1L, numElements).boxed().collect(Collectors.toList());
 
-        assertEquals(expectedSequence, sequence);
+        assertEquals(expectedSequence, sequence); */
     }
 
     private static CompletableFuture<Acknowledge> askTimeoutFuture() {
@@ -257,7 +262,8 @@ public class OperatorEventSendingCheckpointITCase extends TestLogger {
     private static final class AssignAfterCheckpointEnumerator<
                     SplitT extends IteratorSourceSplit<?, ?>>
             extends IteratorSourceEnumerator<SplitT> {
-
+        private static final Logger LOG =
+                LoggerFactory.getLogger(AssignAfterCheckpointEnumerator.class);
         private final Queue<Integer> pendingRequests = new ArrayDeque<>();
         private final SplitEnumeratorContext<?> context;
 
@@ -269,11 +275,13 @@ public class OperatorEventSendingCheckpointITCase extends TestLogger {
 
         @Override
         public void handleSplitRequest(int subtaskId, @Nullable String requesterHostname) {
+            LOG.info("handleSplitRequest s={} r={}", subtaskId, requesterHostname);
             pendingRequests.add(subtaskId);
         }
 
         @Override
         public Collection<SplitT> snapshotState(long checkpointId) throws Exception {
+            LOG.info("snapshotState. pending requests = {}", pendingRequests);
             // this will be enqueued in the enumerator thread, so it will actually run after this
             // method (the snapshot operation) is complete!
             context.runInCoordinatorThread(this::fullFillPendingRequests);
@@ -351,6 +359,7 @@ public class OperatorEventSendingCheckpointITCase extends TestLogger {
             if (o instanceof AddSplitEvent || o instanceof NoMoreSplitsEvent) {
                 // only deal with split related events here
                 if (eventsToFilter.contains(++eventNum)) {
+                    LoggerFactory.getLogger(this.getClass()).info("Filtering event {}", o);
                     return actionForFilteredEvent.handleEvent(task, operator, evt, rpcHandler);
                 }
             }
@@ -421,11 +430,13 @@ public class OperatorEventSendingCheckpointITCase extends TestLogger {
 
         private boolean localRpcCreated;
 
-        public MiniClusterWithRpcIntercepting(final int numSlots) {
+        public MiniClusterWithRpcIntercepting(
+                final int numSlots, final Configuration configuration) {
             super(
                     new MiniClusterConfiguration.Builder()
                             .setRpcServiceSharing(RpcServiceSharing.SHARED)
                             .setNumTaskManagers(1)
+                            .setConfiguration(configuration)
                             .setNumSlotsPerTaskManager(numSlots)
                             .build());
         }

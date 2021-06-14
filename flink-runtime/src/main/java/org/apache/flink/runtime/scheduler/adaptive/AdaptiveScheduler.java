@@ -465,6 +465,7 @@ public class AdaptiveScheduler
 
     @Override
     public boolean updateTaskExecutionState(TaskExecutionStateTransition taskExecutionState) {
+        LOG.info("AS.updateTaskExecutionState " + taskExecutionState);
         return state.tryCall(
                         StateWithExecutionGraph.class,
                         stateWithExecutionGraph ->
@@ -659,13 +660,13 @@ public class AdaptiveScheduler
     public void deliverOperatorEventToCoordinator(
             ExecutionAttemptID taskExecution, OperatorID operator, OperatorEvent evt)
             throws FlinkException {
+        LOG.info("AS: deliverOperatorEventToCoordinator " + evt);
         final StateWithExecutionGraph stateWithExecutionGraph =
                 state.as(StateWithExecutionGraph.class)
                         .orElseThrow(
                                 () ->
                                         new TaskNotRunningException(
                                                 "Task is not known or in state running on the JobManager."));
-
         stateWithExecutionGraph.deliverOperatorEventToCoordinator(taskExecution, operator, evt);
     }
 

@@ -21,6 +21,8 @@ package org.apache.flink.api.connector.source.lib.util;
 import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 
+import org.slf4j.LoggerFactory;
+
 import javax.annotation.Nullable;
 
 import java.util.ArrayDeque;
@@ -58,6 +60,8 @@ public class IteratorSourceEnumerator<SplitT extends IteratorSourceSplit<?, ?>>
 
     @Override
     public void handleSplitRequest(int subtaskId, @Nullable String requesterHostname) {
+        LoggerFactory.getLogger(this.getClass())
+                .info("IteratorSource.handleSplitRequest s={} r={}", subtaskId, requesterHostname);
         final SplitT nextSplit = remainingSplits.poll();
         if (nextSplit != null) {
             context.assignSplit(nextSplit, subtaskId);
@@ -78,10 +82,8 @@ public class IteratorSourceEnumerator<SplitT extends IteratorSourceSplit<?, ?>>
 
     @Override
     public void addReader(int subtaskId) {
-        // we don't assign any splits here, because this registration happens after fist startup
-        // and after each reader restart/recovery
-        // we only want to assign splits once, initially, which we get by reacting to the readers
-        // explicit
-        // split request
+        // we don't assign any splits here, because this registration happens after fist startup and
+        // after each reader restart/recovery we only want to assign splits once, initially, which
+        // we get by reacting to the readers explicit split request
     }
 }
