@@ -17,12 +17,10 @@
   -->
 
 <div class="background">
-    <div #logsBundlerContainer>
-        <button nz-button nzType="primary" (click)="requestArchive()">Request Log Archive</button>
-        <button nz-button nzType="primary" [hidden]="hideDownloadButton" (click)="downloadArchive()">Download Log Archive</button>
-        <div id="status" >
-            <nz-spin nzSimple [hidden]="hideSpinner"></nz-spin>
-            <p [innerText]="message" style="color: white;"></p>
-        </div>
+    <button nz-button nzType="primary" (click)="requestArchive()">Request Log Archive</button>
+    <button nz-button nzType="primary" [hidden]="hideDownloadButton" (click)="downloadArchive()">Download Log Archive</button>
+    <div>
+        <nz-spin nzSimple [hidden]="hideSpinner"></nz-spin>
+        <p [innerText]="message" style="color: white;"></p>
     </div>
 </div>

@@ -22,6 +22,7 @@ import { Observable, Subject} from "rxjs";
 import { StatusService} from "services";
 import {LogsBundlerService} from "../../../services/logs-bundler.service";
 import {BASE_URL} from "config";
+import {LogsBundlerStatus} from "../../../interfaces/logs-bundler";
 
 @Component({
     selector: 'flink-logs-bundler',
@@ -31,7 +32,7 @@ import {BASE_URL} from "config";
 })
 export class LogsBundlerComponent implements OnInit{
     destroy$ = new Subject();
-    @Input() statusObservable: Observable<String>;
+    @Input() statusObservable: Observable<LogsBundlerStatus>;
     hideSpinner: boolean = true;
     message: string = "Welcome to Flink"
     hideDownloadButton: boolean = true;
@@ -49,8 +50,7 @@ export class LogsBundlerComponent implements OnInit{
                     )
                 )
         this.statusObservable.subscribe( status => {
-            //var st: string = status.toString();
-            var st = status;
+            var st = status.status;
             console.log("st", st)
 
             if(st == "IDLE") {
@@ -74,7 +74,6 @@ export class LogsBundlerComponent implements OnInit{
                 this.message = "Creating the bundle failed";
                 this.hideDownloadButton = true;
             }
-            this.message = "st = " + st;
         })
     }
 
