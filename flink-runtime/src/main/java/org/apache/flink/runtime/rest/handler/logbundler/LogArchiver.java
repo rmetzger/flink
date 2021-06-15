@@ -16,26 +16,6 @@
  * limitations under the License.
  */
 
-package org.apache.flink.runtime.rest.messages.logbundler;
+package org.apache.flink.runtime.rest.handler.logbundler;
 
-import org.apache.flink.runtime.rest.handler.logbundler.LogBundlerHandler;
-import org.apache.flink.runtime.rest.messages.ResponseBody;
-
-import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.annotation.JsonProperty;
-
-import java.io.Serializable;
-
-/** POJO providing the status of the {@see LogBundlerHandler}. */
-public class LogBundlerStatus implements ResponseBody, Serializable {
-
-    @JsonProperty("status")
-    private final LogBundlerHandler.Status status;
-
-    @JsonProperty("message")
-    private final String message;
-
-    public LogBundlerStatus(LogBundlerHandler.Status status, String message) {
-        this.status = status;
-        this.message = message;
-    }
-}
+public class LogArchiver {}

@@ -30,7 +30,7 @@ import org.apache.flink.runtime.rest.handler.HandlerRequest;
 import org.apache.flink.runtime.rest.handler.RestHandlerException;
 import org.apache.flink.runtime.rest.handler.util.HandlerUtils;
 import org.apache.flink.runtime.rest.messages.EmptyRequestBody;
-import org.apache.flink.runtime.rest.messages.MessageHeaders;
+import org.apache.flink.runtime.rest.messages.UntypedResponseMessageHeaders;
 import org.apache.flink.runtime.rest.messages.logbundler.LogBundlerActionQueryParameter;
 import org.apache.flink.runtime.rest.messages.logbundler.LogBundlerMessageParameters;
 import org.apache.flink.runtime.rest.messages.logbundler.LogBundlerStatus;
@@ -61,6 +61,7 @@ import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -71,20 +72,29 @@ import java.util.concurrent.ScheduledExecutorService;
 import static org.apache.flink.runtime.rest.handler.resourcemanager.AbstractResourceManagerHandler.getResourceManagerGateway;
 import static org.apache.flink.util.Preconditions.checkState;
 
-/** TODOs: - ui change - add tests - open PR :win: */
+/** TODOs: - add tests - open PR :win: */
 public class LogBundlerHandler
         extends AbstractHandler<RestfulGateway, EmptyRequestBody, LogBundlerMessageParameters> {
 
     private final Object statusLock = new Object();
     private final ScheduledExecutorService executor;
-    private final File bundlerFile;
-    private final File localLogDir;
+    private final GatewayRetriever<ResourceManagerGateway> resourceManagerGatewayRetriever;
+    @Nullable private final File localLogDir;
     private final TransientBlobService transientBlobService;
 
+    // the location of the last successfully created log bundle
+    private File bundlerFile;
+    private LogArchiver logArchiver;
+
+    // null tmp dir indicates the bundler is disabled
+    @Nullable private final String tmpDir;
+
+    // messages for the REST API / frontend
+    private volatile String message = "";
+
+    // status of the bundler
     @GuardedBy("statusLock")
     private volatile Status status = Status.IDLE;
-
-    private final GatewayRetriever<ResourceManagerGateway> resourceManagerGatewayRetriever;
 
     public enum Status {
         IDLE,
@@ -97,7 +107,7 @@ public class LogBundlerHandler
             GatewayRetriever<? extends RestfulGateway> leaderRetriever,
             Time timeout,
             Map<String, String> responseHeaders,
-            MessageHeaders<EmptyRequestBody, LogBundlerStatus, LogBundlerMessageParameters>
+            UntypedResponseMessageHeaders<EmptyRequestBody, LogBundlerMessageParameters>
                     messageHeaders,
             ScheduledExecutorService executor,
             Configuration clusterConfiguration,
@@ -108,16 +118,15 @@ public class LogBundlerHandler
         this.executor = executor;
         this.resourceManagerGatewayRetriever = resourceManagerGatewayRetriever;
         this.transientBlobService = transientBlobService;
-        String[] tmpDirs = ConfigurationUtils.parseTempDirectories(clusterConfiguration);
-        this.bundlerFile =
-                new File(
-                        tmpDirs[0]
-                                + File.separator
-                                + System.currentTimeMillis()
-                                + "-flink-log-bundle.tgz");
-        bundlerFile.deleteOnExit();
-
         this.localLogDir = localLogDir;
+        String[] tmpDirs = ConfigurationUtils.parseTempDirectories(clusterConfiguration);
+        if (tmpDirs.length == 0) {
+            this.message = "No tmp directory available for log bundler";
+            log.error(message);
+            this.tmpDir = null;
+        } else {
+            this.tmpDir = tmpDirs[0];
+        }
     }
 
     @Override
@@ -127,10 +136,13 @@ public class LogBundlerHandler
             HandlerRequest<EmptyRequestBody, LogBundlerMessageParameters> handlerRequest,
             RestfulGateway gateway)
             throws RestHandlerException {
-
         List<String> queryParams =
                 handlerRequest.getQueryParameter(LogBundlerActionQueryParameter.class);
         if (!queryParams.isEmpty()) {
+            if (tmpDir == null) {
+                throw new RestHandlerException(
+                        this.message, HttpResponseStatus.INTERNAL_SERVER_ERROR);
+            }
             synchronized (statusLock) {
                 final String action = queryParams.get(0);
                 if ("download".equals(action)) {
@@ -139,6 +151,9 @@ public class LogBundlerHandler
                                 "There is no bundle ready to be downloaded",
                                 HttpResponseStatus.BAD_REQUEST);
                     }
+                    checkState(
+                            bundlerFile != null,
+                            "Expecting bundler file to be set in state " + Status.BUNDLE_READY);
                     try {
                         HandlerUtils.transferFile(ctx, bundlerFile, httpRequest);
                         return CompletableFuture.completedFuture(null);
@@ -164,7 +179,7 @@ public class LogBundlerHandler
         return HandlerUtils.sendResponse(
                 ctx,
                 httpRequest,
-                new LogBundlerStatus(status),
+                new LogBundlerStatus(status, message),
                 HttpResponseStatus.OK,
                 responseHeaders);
     }
@@ -173,6 +188,13 @@ public class LogBundlerHandler
         synchronized (statusLock) {
             try {
                 checkState(status == Status.PROCESSING);
+                final long creationTime = System.currentTimeMillis();
+                if (bundlerFile != null) {
+                    bundlerFile.delete();
+                }
+                this.bundlerFile =
+                        new File(tmpDir + File.separator + creationTime + "-flink-log-bundle.tgz");
+                bundlerFile.deleteOnExit();
 
                 try (OutputStream fo =
                                 Files.newOutputStream(
@@ -188,11 +210,11 @@ public class LogBundlerHandler
                 }
 
                 status = Status.BUNDLE_READY;
+                message = "Created bundle at " + new Date(creationTime);
             } catch (Throwable throwable) {
                 status = Status.BUNDLE_FAILED;
-                log.warn(
-                        "Error while collecting and compressing logs with the log bundler",
-                        throwable);
+                message = "Error while creating bundle " + throwable.getMessage();
+                log.warn("Error while creating bundle", throwable);
             }
         }
     }
@@ -254,6 +276,9 @@ public class LogBundlerHandler
     }
 
     private void collectLocalLogs(ArchiveOutputStream archiveOutputStream) throws IOException {
+        if (localLogDir == null) {
+            return;
+        }
         File[] localLogFiles = localLogDir.listFiles((dir, name) -> name.endsWith(".log"));
         if (localLogFiles == null || localLogFiles.length == 0) {
             return;
