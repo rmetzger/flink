@@ -44,21 +44,11 @@ import org.apache.flink.shaded.netty4.io.netty.channel.ChannelHandlerContext;
 import org.apache.flink.shaded.netty4.io.netty.handler.codec.http.HttpRequest;
 import org.apache.flink.shaded.netty4.io.netty.handler.codec.http.HttpResponseStatus;
 
-import org.apache.commons.compress.archivers.ArchiveEntry;
-import org.apache.commons.compress.archivers.ArchiveOutputStream;
-import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
-import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
-import org.apache.commons.compress.utils.IOUtils;
-
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.nio.file.Files;
-import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
@@ -70,9 +60,10 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 
 import static org.apache.flink.runtime.rest.handler.resourcemanager.AbstractResourceManagerHandler.getResourceManagerGateway;
+import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.apache.flink.util.Preconditions.checkState;
 
-/** TODOs: - add tests - open PR :win: */
+/** TODOs: - fix retrieval of remote tm logs? - add tests - open PR :win: */
 public class LogBundlerHandler
         extends AbstractHandler<RestfulGateway, EmptyRequestBody, LogBundlerMessageParameters> {
 
@@ -82,9 +73,7 @@ public class LogBundlerHandler
     @Nullable private final File localLogDir;
     private final TransientBlobService transientBlobService;
 
-    // the location of the last successfully created log bundle
-    private File bundlerFile;
-    private LogArchiver logArchiver;
+    @Nullable private LogArchiver logArchiver;
 
     // null tmp dir indicates the bundler is disabled
     @Nullable private final String tmpDir;
@@ -151,11 +140,12 @@ public class LogBundlerHandler
                                 "There is no bundle ready to be downloaded",
                                 HttpResponseStatus.BAD_REQUEST);
                     }
-                    checkState(
-                            bundlerFile != null,
-                            "Expecting bundler file to be set in state " + Status.BUNDLE_READY);
+                    checkNotNull(
+                            logArchiver,
+                            "Assuming log archiver to be set in status " + Status.BUNDLE_READY);
+
                     try {
-                        HandlerUtils.transferFile(ctx, bundlerFile, httpRequest);
+                        HandlerUtils.transferFile(ctx, logArchiver.getArchive(), httpRequest);
                         return CompletableFuture.completedFuture(null);
                     } catch (FlinkException e) {
                         log.warn("Error while transferring file", e);
@@ -188,26 +178,20 @@ public class LogBundlerHandler
         synchronized (statusLock) {
             try {
                 checkState(status == Status.PROCESSING);
+                if (logArchiver != null) {
+                    logArchiver.destroy();
+                }
                 final long creationTime = System.currentTimeMillis();
-                if (bundlerFile != null) {
-                    bundlerFile.delete();
-                }
-                this.bundlerFile =
-                        new File(tmpDir + File.separator + creationTime + "-flink-log-bundle.tgz");
-                bundlerFile.deleteOnExit();
+                logArchiver =
+                        new LogArchiver(
+                                new File(
+                                        tmpDir
+                                                + File.separator
+                                                + creationTime
+                                                + "-flink-log-bundle.tgz"));
 
-                try (OutputStream fo =
-                                Files.newOutputStream(
-                                        bundlerFile.toPath(),
-                                        StandardOpenOption.CREATE,
-                                        StandardOpenOption.WRITE,
-                                        StandardOpenOption.TRUNCATE_EXISTING);
-                        OutputStream gzo = new GzipCompressorOutputStream(fo);
-                        ArchiveOutputStream archiveOutputStream = new TarArchiveOutputStream(gzo)) {
-                    collectLocalLogs(archiveOutputStream);
-                    collectTaskManagerLogs(archiveOutputStream);
-                    archiveOutputStream.finish();
-                }
+                collectLocalLogs();
+                collectTaskManagerLogs();
 
                 status = Status.BUNDLE_READY;
                 message = "Created bundle at " + new Date(creationTime);
@@ -215,11 +199,19 @@ public class LogBundlerHandler
                 status = Status.BUNDLE_FAILED;
                 message = "Error while creating bundle " + throwable.getMessage();
                 log.warn("Error while creating bundle", throwable);
+            } finally {
+                try {
+                    if (logArchiver != null) {
+                        logArchiver.closeArchive();
+                    }
+                } catch (IOException e) {
+                    log.warn("Error while closing log archive", e);
+                }
             }
         }
     }
 
-    private void collectTaskManagerLogs(ArchiveOutputStream archiveOutputStream)
+    private void collectTaskManagerLogs()
             throws RestHandlerException, ExecutionException, InterruptedException {
         final Time timeout = Time.seconds(10);
         final ResourceManagerGateway resourceManagerGateway =
@@ -256,26 +248,23 @@ public class LogBundlerHandler
                                 taskManagerLogFiles.forEach(
                                         taskManagerLogFileOptional ->
                                                 taskManagerLogFileOptional.ifPresent(
-                                                        taskManagerLogFile ->
-                                                                addTaskManagerLogFile(
-                                                                        taskManagerLogFile,
-                                                                        archiveOutputStream))))
+                                                        this::addTaskManagerLogFile)))
                 .get();
     }
 
-    private void addTaskManagerLogFile(
-            TaskManagerLogAndId logFile, ArchiveOutputStream outputStream) {
+    private void addTaskManagerLogFile(TaskManagerLogAndId logFile) {
+        checkNotNull(logArchiver, "Assuming log archiver to be set");
         try {
-            addArchiveEntry(
+            logArchiver.addArchiveEntry(
                     "taskmanager-" + logFile.getTaskManagerId().toString() + ".log",
-                    logFile.getLogFile(),
-                    outputStream);
+                    logFile.getLogFile());
         } catch (IOException e) {
             log.warn("Error while adding TaskManager log file to archive", e);
         }
     }
 
-    private void collectLocalLogs(ArchiveOutputStream archiveOutputStream) throws IOException {
+    private void collectLocalLogs() throws IOException {
+        checkNotNull(logArchiver, "Assuming log archiver to be set");
         if (localLogDir == null) {
             return;
         }
@@ -284,21 +273,8 @@ public class LogBundlerHandler
             return;
         }
         for (File localLogFile : localLogFiles) {
-            addArchiveEntry(localLogFile.getName(), localLogFile, archiveOutputStream);
+            logArchiver.addArchiveEntry(localLogFile.getName(), localLogFile);
         }
-    }
-
-    private void addArchiveEntry(String entryName, File file, ArchiveOutputStream outputStream)
-            throws IOException {
-        // todo: dedupe entryNames
-        ArchiveEntry entry = outputStream.createArchiveEntry(file, entryName);
-        outputStream.putArchiveEntry(entry);
-        if (file.isFile()) {
-            try (InputStream inputStream = Files.newInputStream(file.toPath())) {
-                IOUtils.copy(inputStream, outputStream);
-            }
-        }
-        outputStream.closeArchiveEntry();
     }
 
     private static class TaskManagerLogAndId {

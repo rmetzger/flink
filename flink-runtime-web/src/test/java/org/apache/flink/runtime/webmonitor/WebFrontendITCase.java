@@ -33,6 +33,7 @@ import org.apache.flink.runtime.jobgraph.JobGraphBuilder;
 import org.apache.flink.runtime.jobgraph.JobGraphTestUtils;
 import org.apache.flink.runtime.jobgraph.JobVertex;
 import org.apache.flink.runtime.jobgraph.tasks.AbstractInvokable;
+import org.apache.flink.runtime.testutils.CommonTestUtils;
 import org.apache.flink.runtime.testutils.MiniClusterResourceConfiguration;
 import org.apache.flink.runtime.webmonitor.testutils.HttpTestClient;
 import org.apache.flink.test.util.MiniClusterWithClientResource;
@@ -44,6 +45,10 @@ import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.ObjectMap
 import org.apache.flink.shaded.jackson2.com.fasterxml.jackson.databind.node.ArrayNode;
 import org.apache.flink.shaded.netty4.io.netty.handler.codec.http.HttpResponseStatus;
 
+import org.apache.commons.compress.archivers.ArchiveEntry;
+import org.apache.commons.compress.archivers.ArchiveInputStream;
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
+import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.junit.After;
@@ -51,6 +56,7 @@ import org.junit.Assert;
 import org.junit.ClassRule;
 import org.junit.Test;
 
+import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.InputStream;
@@ -59,6 +65,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -68,7 +75,10 @@ import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
 import static org.hamcrest.CoreMatchers.containsString;
+import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.greaterThan;
+import static org.hamcrest.collection.IsCollectionWithSize.hasSize;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -130,14 +140,50 @@ public class WebFrontendITCase extends TestLogger {
         assertThat(fromHTTP, containsString("Apache Flink Web Dashboard"));
     }
 
-    @Test
+    /*@Test
     public void dev() throws Exception {
         System.out.println("http://localhost:" + getRestPort() + "/logbundler");
         Thread.sleep(500000);
-    }
+    } */
 
-    private int getRestPort() {
-        return CLUSTER.getRestAddres().getPort();
+    @Test
+    public void testLogBundler() throws Exception {
+        // assume bundler is IDLE initially
+        String bundlerStatus =
+                TestBaseUtils.getFromHTTP("http://localhost:" + getRestPort() + "/logbundler");
+        assertThat(bundlerStatus, containsString("IDLE"));
+
+        // trigger bundler
+        TestBaseUtils.getFromHTTP(
+                "http://localhost:" + getRestPort() + "/logbundler?action=trigger");
+
+        // poll for readiness
+        CommonTestUtils.waitUntilCondition(
+                () -> {
+                    String bundlerStatusString =
+                            TestBaseUtils.getFromHTTP(
+                                    "http://localhost:" + getRestPort() + "/logbundler");
+                    return bundlerStatusString.contains("BUNDLE_READY");
+                },
+                Deadline.fromNow(Duration.ofSeconds(10)));
+
+        // download archive
+        InputStream archiveStream =
+                TestBaseUtils.getInputStreamFromHTTP(
+                        "http://localhost:" + getRestPort() + "/logbundler?action=download",
+                        TestBaseUtils.DEFAULT_HTTP_TIMEOUT);
+        List<String> filesInArchive = new ArrayList<>();
+        try (InputStream bi = new BufferedInputStream(archiveStream);
+                InputStream gzi = new GzipCompressorInputStream(bi);
+                ArchiveInputStream o = new TarArchiveInputStream(gzi)) {
+            ArchiveEntry entry = null;
+            while ((entry = o.getNextEntry()) != null) {
+                filesInArchive.add(entry.getName());
+                assertThat(entry.isDirectory(), is(false));
+                assertThat(entry.getSize(), greaterThan(0L));
+            }
+        }
+        assertThat(filesInArchive, hasSize(3)); // jobmanager + 2 taskmanagers logs
     }
 
     @Test
@@ -231,13 +277,15 @@ public class WebFrontendITCase extends TestLogger {
 
         String customFileName = "test.log";
         final String logDir = logFiles.logFile.getParent();
+        File customFile = new File(logDir, customFileName);
         final String expectedLogContent = "job manager custom log";
-        FileUtils.writeStringToFile(new File(logDir, customFileName), expectedLogContent);
+        FileUtils.writeStringToFile(customFile, expectedLogContent);
 
         String logs =
                 TestBaseUtils.getFromHTTP(
                         "http://localhost:" + getRestPort() + "/jobmanager/logs/" + customFileName);
         assertThat(logs, containsString(expectedLogContent));
+        customFile.delete();
     }
 
     @Test
@@ -439,6 +487,10 @@ public class WebFrontendITCase extends TestLogger {
         }
 
         BlockingInvokable.reset();
+    }
+
+    private int getRestPort() {
+        return CLUSTER.getRestAddres().getPort();
     }
 
     private static List<JobID> getRunningJobs(ClusterClient<?> client) throws Exception {
