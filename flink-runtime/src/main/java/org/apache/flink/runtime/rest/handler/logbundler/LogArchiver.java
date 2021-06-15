@@ -38,7 +38,7 @@ import java.util.regex.Pattern;
 
 import static org.apache.flink.util.Preconditions.checkState;
 
-/** Simple wrapper around */
+/** Simple util for creating the log archive. */
 public class LogArchiver {
     private static final Pattern namePattern = Pattern.compile("\\.([0-9]+)$");
 
@@ -99,13 +99,14 @@ public class LogArchiver {
     }
 
     public void destroy() throws IOException {
-        if (!isClosed) {
-            archiveOutputStream.close();
-        }
+        closeArchive();
         file.delete();
     }
 
     public void closeArchive() throws IOException {
+        if (isClosed) {
+            return;
+        }
         archiveOutputStream.close();
         isClosed = true;
     }

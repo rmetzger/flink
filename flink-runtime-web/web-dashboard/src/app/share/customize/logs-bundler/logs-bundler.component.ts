@@ -51,15 +51,14 @@ export class LogsBundlerComponent implements OnInit{
                     )
                 )
         this.statusObservable.subscribe( status => {
-            const st = status.status;
             this.message = status.message;
             this.hideSpinner = true;
             this.hideDownloadButton = true;
 
-            if(st == "PROCESSING") {
+            if(status.status == "PROCESSING") {
                 this.hideSpinner = false;
             }
-            if (st == "BUNDLE_READY") {
+            if (status.status == "BUNDLE_READY") {
                 this.hideDownloadButton = false;
             }
             this.cdr.markForCheck();
@@ -67,7 +66,6 @@ export class LogsBundlerComponent implements OnInit{
     }
 
     requestArchive() {
-        console.log("request archive");
         this.logBundlerService.triggerBundle();
         this.hideSpinner = false;
         this.hideDownloadButton = true;

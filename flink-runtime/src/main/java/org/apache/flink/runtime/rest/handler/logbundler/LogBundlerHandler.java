@@ -63,10 +63,14 @@ import static org.apache.flink.runtime.rest.handler.resourcemanager.AbstractReso
 import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.apache.flink.util.Preconditions.checkState;
 
-/** TODOs: - fix retrieval of remote tm logs? - add tests - open PR :win: */
+/**
+ * Handler which creates a downloadable archive containing all local (JobManager) and remove
+ * (JobManager) log files.
+ */
 public class LogBundlerHandler
         extends AbstractHandler<RestfulGateway, EmptyRequestBody, LogBundlerMessageParameters> {
 
+    private final Time rpcTimeout = Time.seconds(10);
     private final Object statusLock = new Object();
     private final ScheduledExecutorService executor;
     private final GatewayRetriever<ResourceManagerGateway> resourceManagerGatewayRetriever;
@@ -177,7 +181,7 @@ public class LogBundlerHandler
     private void collectAndCompressLogs() {
         synchronized (statusLock) {
             try {
-                checkState(status == Status.PROCESSING);
+                checkState(status == Status.PROCESSING, "Not in status PROCESSING");
                 if (logArchiver != null) {
                     logArchiver.destroy();
                 }
@@ -213,43 +217,43 @@ public class LogBundlerHandler
 
     private void collectTaskManagerLogs()
             throws RestHandlerException, ExecutionException, InterruptedException {
-        final Time timeout = Time.seconds(10);
         final ResourceManagerGateway resourceManagerGateway =
                 getResourceManagerGateway(resourceManagerGatewayRetriever);
         Collection<TaskManagerInfo> taskManagers =
-                resourceManagerGateway.requestTaskManagerInfo(timeout).get();
-        Collection<CompletableFuture<Optional<TaskManagerLogAndId>>> taskManagerLogsFuture =
+                resourceManagerGateway.requestTaskManagerInfo(rpcTimeout).get();
+        Collection<CompletableFuture<Optional<TaskManagerLogAndId>>> tmLogsFuture =
                 new ArrayList<>(taskManagers.size());
         for (TaskManagerInfo taskManagerInfo : taskManagers) {
-            taskManagerLogsFuture.add(
-                    resourceManagerGateway
-                            .requestTaskManagerFileUploadByType(
-                                    taskManagerInfo.getResourceId(), FileType.LOG, timeout)
-                            .thenApplyAsync(
-                                    tmLogBlobKey -> {
-                                        try {
-                                            return Optional.of(
-                                                    new TaskManagerLogAndId(
-                                                            taskManagerInfo.getResourceId(),
-                                                            transientBlobService.getFile(
-                                                                    tmLogBlobKey)));
-                                        } catch (IOException e) {
-                                            log.warn(
-                                                    "Error while retrieving log from TaskManager",
-                                                    e);
-                                            return Optional.empty();
-                                        }
-                                    },
-                                    executor));
+            tmLogsFuture.add(requestLogs(resourceManagerGateway, taskManagerInfo));
         }
-        FutureUtils.combineAll(taskManagerLogsFuture)
+        FutureUtils.combineAll(tmLogsFuture)
                 .thenAccept(
-                        taskManagerLogFiles ->
-                                taskManagerLogFiles.forEach(
-                                        taskManagerLogFileOptional ->
-                                                taskManagerLogFileOptional.ifPresent(
+                        tmLogs ->
+                                tmLogs.forEach(
+                                        tmLogOptional ->
+                                                tmLogOptional.ifPresent(
                                                         this::addTaskManagerLogFile)))
                 .get();
+    }
+
+    private CompletableFuture<Optional<TaskManagerLogAndId>> requestLogs(
+            ResourceManagerGateway resourceManagerGateway, TaskManagerInfo taskManager) {
+        return resourceManagerGateway
+                .requestTaskManagerFileUploadByType(
+                        taskManager.getResourceId(), FileType.LOG, rpcTimeout)
+                .thenApplyAsync(
+                        tmLogBlobKey -> {
+                            try {
+                                return Optional.of(
+                                        new TaskManagerLogAndId(
+                                                taskManager.getResourceId(),
+                                                transientBlobService.getFile(tmLogBlobKey)));
+                            } catch (IOException e) {
+                                log.warn("Error while retrieving log from TaskManager", e);
+                                return Optional.empty();
+                            }
+                        },
+                        executor);
     }
 
     private void addTaskManagerLogFile(TaskManagerLogAndId logFile) {

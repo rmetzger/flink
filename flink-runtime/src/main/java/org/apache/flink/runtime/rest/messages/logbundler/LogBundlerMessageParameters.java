@@ -18,6 +18,7 @@
 
 package org.apache.flink.runtime.rest.messages.logbundler;
 
+import org.apache.flink.runtime.rest.handler.logbundler.LogBundlerHandler;
 import org.apache.flink.runtime.rest.messages.MessageParameters;
 import org.apache.flink.runtime.rest.messages.MessagePathParameter;
 import org.apache.flink.runtime.rest.messages.MessageQueryParameter;
@@ -25,6 +26,7 @@ import org.apache.flink.runtime.rest.messages.MessageQueryParameter;
 import java.util.Collection;
 import java.util.Collections;
 
+/** Message parameters for {@link LogBundlerHandler}. */
 public class LogBundlerMessageParameters extends MessageParameters {
 
     public final LogBundlerActionQueryParameter action = new LogBundlerActionQueryParameter();

@@ -18,9 +18,11 @@
 
 package org.apache.flink.runtime.rest.messages.logbundler;
 
+import org.apache.flink.runtime.rest.handler.logbundler.LogBundlerHandler;
 import org.apache.flink.runtime.rest.messages.ConversionException;
 import org.apache.flink.runtime.rest.messages.MessageQueryParameter;
 
+/** Query parameter for {@link LogBundlerHandler}. */
 public class LogBundlerActionQueryParameter extends MessageQueryParameter<String> {
     private static final String key = "action";
 

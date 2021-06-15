@@ -34,5 +34,9 @@ public class LogArchiverTest extends TestLogger {
                 LogArchiver.getNextEntryName("jobmanager-test.log"), is("jobmanager-test.log.1"));
         assertThat(
                 LogArchiver.getNextEntryName("jobmanager-test.log.3"), is("jobmanager-test.log.4"));
+
+        assertThat(
+                LogArchiver.getNextEntryName("jobmanager-test.log.3.4.2.3"),
+                is("jobmanager-test.log.3.4.2.4"));
     }
 }
