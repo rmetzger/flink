@@ -17,5 +17,6 @@
  */
 
 export interface LogsBundlerStatus {
-    status: string
+    status: string,
+    message: string
 }

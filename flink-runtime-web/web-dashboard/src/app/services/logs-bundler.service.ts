@@ -33,7 +33,14 @@ export class LogsBundlerService {
      * trigger log bundling
      */
     triggerBundle() {
-        this.httpClient.get(`${BASE_URL}/logbundler?action=trigger`).pipe(catchError(() => EMPTY));
+        var res = this.httpClient.get(`${BASE_URL}/logbundler?action=trigger`).pipe(catchError(() => {
+            return EMPTY
+        }));
+        // TODO this seems to be needed to trigger the call?
+        res.toPromise().then(() => {
+            console.log("fulfilled")
+        })
+        return res;
     }
 
     getStatus() {

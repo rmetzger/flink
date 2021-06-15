@@ -51,36 +51,26 @@ export class LogsBundlerComponent implements OnInit{
                     )
                 )
         this.statusObservable.subscribe( status => {
-            var st = status.status;
-            console.log("st", st)
+            const st = status.status;
+            this.message = status.message;
+            this.hideSpinner = true;
+            this.hideDownloadButton = true;
 
-            if(st == "IDLE") {
-                this.hideSpinner = true;
-                this.message = "";
-                this.hideDownloadButton = true;
-            }
             if(st == "PROCESSING") {
                 this.hideSpinner = false;
-                this.message = "Please wait while bundling all logs";
-                this.hideDownloadButton = true;
             }
             if (st == "BUNDLE_READY") {
-                this.hideSpinner = true;
-                this.message = "Bundle ready to download";
                 this.hideDownloadButton = false;
-            }
-            if (st == "BUNDLE_FAILED") {
-                this.hideSpinner = true;
-                this.message = "Creating the bundle failed";
-                this.hideDownloadButton = true;
             }
             this.cdr.markForCheck();
         })
     }
 
     requestArchive() {
+        console.log("request archive");
         this.logBundlerService.triggerBundle();
         this.hideSpinner = false;
+        this.hideDownloadButton = true;
     }
     downloadArchive() {
         window.open(`${BASE_URL}/logbundler?action=download`);
