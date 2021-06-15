@@ -47,6 +47,7 @@ import org.apache.flink.util.Preconditions;
 import org.apache.flink.util.TestLogger;
 
 import org.apache.flink.shaded.netty4.io.netty.buffer.ByteBufAllocator;
+import org.apache.flink.shaded.netty4.io.netty.buffer.UnpooledHeapByteBuf;
 import org.apache.flink.shaded.netty4.io.netty.channel.Channel;
 import org.apache.flink.shaded.netty4.io.netty.channel.ChannelFuture;
 import org.apache.flink.shaded.netty4.io.netty.channel.ChannelHandler;
@@ -65,6 +66,7 @@ import org.apache.flink.shaded.netty4.io.netty.util.AttributeKey;
 import org.apache.flink.shaded.netty4.io.netty.util.concurrent.EventExecutor;
 import org.apache.flink.shaded.netty4.io.netty.util.concurrent.ImmediateEventExecutor;
 
+import org.apache.commons.compress.utils.IOUtils;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
@@ -74,6 +76,7 @@ import org.junit.rules.TemporaryFolder;
 
 import javax.annotation.Nonnull;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -326,6 +329,15 @@ public class AbstractTaskManagerFileHandlerTest extends TestLogger {
                     fileOutputStream.getChannel();
 
                     defaultFileRegion.transferTo(fileOutputStream.getChannel(), 0L);
+                } catch (IOException ioe) {
+                    throw new RuntimeException(ioe);
+                }
+            }
+            if (msg instanceof UnpooledHeapByteBuf) {
+                try (final FileOutputStream fileOutputStream = new FileOutputStream(outputFile);
+                        final ByteArrayInputStream byteArrayInputStream =
+                                new ByteArrayInputStream(((UnpooledHeapByteBuf) msg).array())) {
+                    IOUtils.copy(byteArrayInputStream, fileOutputStream);
                 } catch (IOException ioe) {
                     throw new RuntimeException(ioe);
                 }
