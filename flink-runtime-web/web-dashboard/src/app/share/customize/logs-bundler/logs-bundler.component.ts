@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-import {ChangeDetectionStrategy, Component, Input, OnInit} from '@angular/core';
+import {ChangeDetectionStrategy, ChangeDetectorRef, Component, Input, OnInit} from '@angular/core';
 import {flatMap, takeUntil} from "rxjs/operators";
 import { Observable, Subject} from "rxjs";
 import { StatusService} from "services";
@@ -34,11 +34,12 @@ export class LogsBundlerComponent implements OnInit{
     destroy$ = new Subject();
     @Input() statusObservable: Observable<LogsBundlerStatus>;
     hideSpinner: boolean = true;
-    message: string = "Welcome to Flink"
+    message: string = ""
     hideDownloadButton: boolean = true;
 
     constructor(private logBundlerService: LogsBundlerService,
-                private statusService: StatusService) {
+                private statusService: StatusService,
+                private cdr: ChangeDetectorRef) {
     }
 
     ngOnInit() {
@@ -67,13 +68,13 @@ export class LogsBundlerComponent implements OnInit{
                 this.hideSpinner = true;
                 this.message = "Bundle ready to download";
                 this.hideDownloadButton = false;
-                console.log(this.hideDownloadButton)
             }
             if (st == "BUNDLE_FAILED") {
                 this.hideSpinner = true;
                 this.message = "Creating the bundle failed";
                 this.hideDownloadButton = true;
             }
+            this.cdr.markForCheck();
         })
     }
 

@@ -17,8 +17,8 @@
   -->
 
 <div class="background">
-    <button nz-button nzType="primary" (click)="requestArchive()">Request Log Archive</button>
-    <button nz-button nzType="primary" [hidden]="hideDownloadButton" (click)="downloadArchive()">Download Log Archive</button>
+    <button nz-button nzType="primary" (click)="requestArchive()">Request New Log Archive</button>
+    <button nz-button nzType="primary" [hidden]="hideDownloadButton" (click)="downloadArchive()" style="margin-top:5px">Download Log Archive</button>
     <div>
         <nz-spin nzSimple [hidden]="hideSpinner"></nz-spin>
         <p [innerText]="message" style="color: white;"></p>
