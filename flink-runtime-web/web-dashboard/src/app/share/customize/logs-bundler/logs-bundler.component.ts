@@ -16,23 +16,20 @@
  * limitations under the License.
  */
 
-import {ChangeDetectionStrategy, ChangeDetectorRef, Component, Input, OnInit} from '@angular/core';
-import {flatMap, takeUntil} from "rxjs/operators";
-import { Observable, Subject} from "rxjs";
+import {ChangeDetectionStrategy, ChangeDetectorRef, Component, OnDestroy, OnInit} from '@angular/core';
+import { switchMap, takeUntil} from "rxjs/operators";
+import { Subject} from "rxjs";
 import { StatusService} from "services";
 import {LogsBundlerService} from "../../../services/logs-bundler.service";
-import {BASE_URL} from "config";
-import {LogsBundlerStatus} from "../../../interfaces/logs-bundler";
 
 @Component({
     selector: 'flink-logs-bundler',
     templateUrl: './logs-bundler.component.html',
-    styleUrls: [],
+    styleUrls: ['./logs-bundler.component.less'],
     changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class LogsBundlerComponent implements OnInit{
-    destroy$ = new Subject();
-    @Input() statusObservable: Observable<LogsBundlerStatus>;
+export class LogsBundlerComponent implements OnInit, OnDestroy {
+    private destroy$ = new Subject<void>();
     hideSpinner: boolean = true;
     message: string = ""
     hideDownloadButton: boolean = true;
@@ -43,35 +40,30 @@ export class LogsBundlerComponent implements OnInit{
     }
 
     ngOnInit() {
-        this.statusObservable = this.statusService.refresh$
-            .pipe(
-                takeUntil(this.destroy$),
-                flatMap(() =>
-                    this.logBundlerService.getStatus()
-                    )
-                )
-        this.statusObservable.subscribe( status => {
+        this.statusService.refresh$.pipe(
+            switchMap(() => this.logBundlerService.getStatus()),
+            takeUntil(this.destroy$)
+        ).subscribe( status => {
             this.message = status.message;
-            this.hideSpinner = true;
-            this.hideDownloadButton = true;
-
-            if(status.status == "PROCESSING") {
-                this.hideSpinner = false;
-            }
-            if (status.status == "BUNDLE_READY") {
-                this.hideDownloadButton = false;
-            }
+            this.hideSpinner = (status.status !== "PROCESSING");
+            this.hideDownloadButton = (status.status !== "BUNDLE_READY");
             this.cdr.markForCheck();
+        }, error => {
+            this.message = "Error while fetching status: " + error.message;
         })
+    }
+    ngOnDestroy() {
+        this.destroy$.next();
+        this.destroy$.complete();
     }
 
     requestArchive() {
-        this.logBundlerService.triggerBundle();
+        this.logBundlerService.triggerBundle().subscribe();
         this.hideSpinner = false;
         this.hideDownloadButton = true;
     }
     downloadArchive() {
-        window.open(`${BASE_URL}/logbundler?action=download`);
+        this.logBundlerService.download();
     }
 
 }

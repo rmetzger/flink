@@ -16,31 +16,19 @@
  * limitations under the License.
  */
 
-import { HttpClient } from '@angular/common/http';
-import { Injectable } from '@angular/core';
-import { EMPTY } from 'rxjs';
-import { catchError } from 'rxjs/operators';
-import { BASE_URL } from '../app.config';
-import {LogsBundlerStatus} from "../interfaces/logs-bundler";
+#download-button {
+  margin-top:4px;
+}
 
-@Injectable({
-    providedIn: 'root'
-})
-export class LogsBundlerService {
-    constructor(private httpClient: HttpClient) {}
+#spinner-container {
+  margin: auto;
+  width: 50%;
+}
 
-    /**
-     * trigger log bundling
-     */
-    triggerBundle() {
-        return this.httpClient.get(`${BASE_URL}/logbundler?action=trigger`).pipe(catchError(() => EMPTY));
-    }
+#spinner {
+  margin-top:5px;
+}
 
-    getStatus() {
-        return this.httpClient.get<LogsBundlerStatus>(`${BASE_URL}/logbundler`);
-    }
-
-    download() {
-        window.open(`${BASE_URL}/logbundler?action=download`);
-    }
+#message {
+  color: white;
 }

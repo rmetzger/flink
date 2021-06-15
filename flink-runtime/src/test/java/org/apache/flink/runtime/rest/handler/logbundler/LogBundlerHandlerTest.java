@@ -111,10 +111,13 @@ public class LogBundlerHandlerTest extends TestLogger {
         config.set(CoreOptions.TMP_DIRS, "");
         LogBundlerHandler handler = createHandler(config);
 
+        // assert that status queries are possible even if no tmp dir is set
         final TestContext testingContext = new TestContext();
+        handler.respondToRequest(testingContext, HTTP_REQUEST, handlerRequest, null);
+        assertThat(testingContext.getResponse(), containsString("IDLE"));
 
         handler.respondToRequest(
-                testingContext, HTTP_REQUEST, createActionRequest("trigger"), null);
+                new TestContext(), HTTP_REQUEST, createActionRequest("trigger"), null);
     }
 
     @Test(expected = RestHandlerException.class)

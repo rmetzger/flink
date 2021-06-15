@@ -84,7 +84,7 @@ export function AppInitServiceFactory(
 
 @NgModule({
   declarations: [AppComponent],
-    imports: [BrowserModule, AppRoutingModule, NgZorroAntdModule, FormsModule, HttpClientModule, BrowserAnimationsModule, ShareModule],
+  imports: [BrowserModule, AppRoutingModule, NgZorroAntdModule, FormsModule, HttpClientModule, BrowserAnimationsModule, ShareModule],
   providers: [
     {
       provide: NZ_I18N,

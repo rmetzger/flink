@@ -38,7 +38,7 @@ import java.util.regex.Pattern;
 
 import static org.apache.flink.util.Preconditions.checkState;
 
-/** Simple util for creating the log archive. */
+/** Simple util for creating a log archive. */
 public class LogArchiver {
     private static final Pattern namePattern = Pattern.compile("\\.([0-9]+)$");
 
@@ -65,7 +65,6 @@ public class LogArchiver {
 
     public File getArchive() {
         checkState(isClosed, "Can not download archive before it has been closed.");
-
         return file;
     }
 
