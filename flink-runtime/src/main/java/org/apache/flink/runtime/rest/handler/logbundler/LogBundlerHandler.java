@@ -89,7 +89,8 @@ public class LogBundlerHandler
     @GuardedBy("statusLock")
     private volatile Status status = Status.IDLE;
 
-    enum Status {
+    /** States of the log bundler. */
+    public enum Status {
         IDLE,
         PROCESSING,
         BUNDLE_READY,

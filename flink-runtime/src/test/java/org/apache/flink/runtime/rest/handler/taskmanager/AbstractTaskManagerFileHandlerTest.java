@@ -309,11 +309,11 @@ public class AbstractTaskManagerFileHandlerTest extends TestLogger {
     }
 
     /** Testing implementation of {@link ChannelHandlerContext}. */
-    private static final class TestingChannelHandlerContext implements ChannelHandlerContext {
+    public static final class TestingChannelHandlerContext implements ChannelHandlerContext {
 
         final File outputFile;
 
-        private TestingChannelHandlerContext(File outputFile) {
+        public TestingChannelHandlerContext(File outputFile) {
             this.outputFile = Preconditions.checkNotNull(outputFile);
         }
 
@@ -543,11 +543,11 @@ public class AbstractTaskManagerFileHandlerTest extends TestLogger {
     }
 
     /** Testing {@link UntypedResponseMessageHeaders}. */
-    private static final class TestUntypedMessageHeaders
+    public static final class TestUntypedMessageHeaders
             implements UntypedResponseMessageHeaders<
                     EmptyRequestBody, TaskManagerMessageParameters> {
 
-        private static final String URL = "/foobar";
+        public static final String URL = "/foobar";
 
         @Override
         public Class<EmptyRequestBody> getRequestClass() {
