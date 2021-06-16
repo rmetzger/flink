@@ -50,6 +50,7 @@ export class LogsBundlerComponent implements OnInit, OnDestroy {
             this.cdr.markForCheck();
         }, error => {
             this.message = "Error while fetching status: " + error.message;
+            this.cdr.markForCheck();
         })
     }
     ngOnDestroy() {

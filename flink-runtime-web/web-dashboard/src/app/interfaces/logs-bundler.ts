@@ -17,6 +17,6 @@
  */
 
 export interface LogsBundlerStatus {
-    status: "IDLE" | "PROCESSING" | "BUNDLE_READY" | "BUNDLE_FAILED"
+    status: "IDLE" | "PROCESSING" | "BUNDLE_READY" | "BUNDLE_FAILED";
     message: string;
 }
