@@ -177,7 +177,9 @@ public class WebFrontendITCase extends TestLogger {
                 assertThat(entry.getSize(), greaterThan(0L));
             }
         }
-        assertThat(filesInArchive, hasSize(3)); // jobmanager + 2 taskmanagers logs
+        // jobmanager + 2 taskmanagers logs
+        // + jobmanager threaddump + 2 taskmanager threaddumps
+        assertThat(filesInArchive, hasSize(6));
     }
 
     @Test

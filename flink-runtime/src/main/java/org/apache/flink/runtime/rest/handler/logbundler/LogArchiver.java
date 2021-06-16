@@ -20,7 +20,7 @@ package org.apache.flink.runtime.rest.handler.logbundler;
 
 import org.apache.flink.annotation.VisibleForTesting;
 
-import org.apache.commons.compress.archivers.ArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.apache.commons.compress.utils.IOUtils;
@@ -68,21 +68,29 @@ public class LogArchiver {
         return file;
     }
 
-    public void addArchiveEntry(String entryName, File file) throws IOException {
+    public synchronized void addArchiveEntry(String entryName, InputStream input, long size)
+            throws IOException {
         checkState(!isClosed, "Can not add archive entry to closed archiver");
         String internalEntryName = entryName;
         while (entryNames.contains(internalEntryName)) {
             internalEntryName = getNextEntryName(internalEntryName);
         }
         entryNames.add(internalEntryName);
-        ArchiveEntry entry = archiveOutputStream.createArchiveEntry(file, internalEntryName);
+        // ArchiveEntry entry = archiveOutputStream.createArchiveEntry(file, internalEntryName);
+        TarArchiveEntry entry = new TarArchiveEntry(internalEntryName);
+        entry.setSize(size);
+        entry.setMode(TarArchiveEntry.DEFAULT_FILE_MODE);
+        entry.setModTime(file.lastModified() / TarArchiveEntry.MILLIS_PER_SECOND);
+        entry.setUserName("");
         archiveOutputStream.putArchiveEntry(entry);
-        if (file.isFile()) {
-            try (InputStream inputStream = Files.newInputStream(file.toPath())) {
-                IOUtils.copy(inputStream, archiveOutputStream);
-            }
-        }
+        IOUtils.copy(input, archiveOutputStream);
         archiveOutputStream.closeArchiveEntry();
+    }
+
+    public void addArchiveEntry(String entryName, File file) throws IOException {
+        try (InputStream input = Files.newInputStream(file.toPath())) {
+            addArchiveEntry(entryName, input, file.length());
+        }
     }
 
     @VisibleForTesting

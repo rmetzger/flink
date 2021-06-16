@@ -35,7 +35,9 @@ import org.apache.flink.runtime.rest.messages.logbundler.LogBundlerActionQueryPa
 import org.apache.flink.runtime.rest.messages.logbundler.LogBundlerMessageParameters;
 import org.apache.flink.runtime.rest.messages.logbundler.LogBundlerStatus;
 import org.apache.flink.runtime.rest.messages.taskmanager.TaskManagerInfo;
+import org.apache.flink.runtime.rest.messages.taskmanager.ThreadDumpInfo;
 import org.apache.flink.runtime.taskexecutor.FileType;
+import org.apache.flink.runtime.util.JvmUtils;
 import org.apache.flink.runtime.webmonitor.RestfulGateway;
 import org.apache.flink.runtime.webmonitor.retriever.GatewayRetriever;
 import org.apache.flink.util.FlinkException;
@@ -47,8 +49,12 @@ import org.apache.flink.shaded.netty4.io.netty.handler.codec.http.HttpResponseSt
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.lang.management.ThreadInfo;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
@@ -58,6 +64,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.stream.Collectors;
 
 import static org.apache.flink.runtime.rest.handler.resourcemanager.AbstractResourceManagerHandler.getResourceManagerGateway;
 import static org.apache.flink.util.Preconditions.checkNotNull;
@@ -196,7 +203,8 @@ public class LogBundlerHandler
                                                 + "-flink-log-bundle.tgz"));
 
                 collectLocalLogs();
-                collectTaskManagerLogs();
+                collectLocalThreadDump();
+                collectTaskManagerLogsAndThreadDumps();
 
                 status = Status.BUNDLE_READY;
                 message = "Created bundle at " + new Date(creationTime);
@@ -216,25 +224,63 @@ public class LogBundlerHandler
         }
     }
 
-    private void collectTaskManagerLogs()
+    private void collectLocalThreadDump() {
+        Collection<ThreadInfo> threadDump = JvmUtils.createThreadDump();
+        final Collection<ThreadDumpInfo.ThreadInfo> threadInfos =
+                threadDump.stream()
+                        .map(
+                                threadInfo ->
+                                        ThreadDumpInfo.ThreadInfo.create(
+                                                threadInfo.getThreadName(), threadInfo.toString()))
+                        .collect(Collectors.toList());
+        addThreadDumps("jobmanager", threadInfos);
+    }
+
+    private void collectTaskManagerLogsAndThreadDumps()
             throws RestHandlerException, ExecutionException, InterruptedException {
         final ResourceManagerGateway resourceManagerGateway =
                 getResourceManagerGateway(resourceManagerGatewayRetriever);
         Collection<TaskManagerInfo> taskManagers =
                 resourceManagerGateway.requestTaskManagerInfo(rpcTimeout).get();
-        Collection<CompletableFuture<Optional<TaskManagerLogAndId>>> tmLogsFuture =
-                new ArrayList<>(taskManagers.size());
+        // for this asynchronous collection of data, logArchiver.addArchiveEntry must be serialized
+        Collection<CompletableFuture<Void>> collectionTaskFutures = new ArrayList<>();
         for (TaskManagerInfo taskManagerInfo : taskManagers) {
-            tmLogsFuture.add(requestLogs(resourceManagerGateway, taskManagerInfo));
+            CompletableFuture<Void> collectLogs =
+                    requestLogs(resourceManagerGateway, taskManagerInfo)
+                            .thenAccept(
+                                    maybeLogs -> maybeLogs.ifPresent(this::addTaskManagerLogFile));
+            collectionTaskFutures.add(collectLogs);
+
+            CompletableFuture<Void> collectThreaddumps =
+                    resourceManagerGateway
+                            .requestThreadDump(taskManagerInfo.getResourceId(), rpcTimeout)
+                            .thenAccept(
+                                    threadDumpInfo ->
+                                            addThreadDumps(
+                                                    taskManagerInfo
+                                                            .getResourceId()
+                                                            .getResourceIdString(),
+                                                    threadDumpInfo.getThreadInfos()));
+            collectionTaskFutures.add(collectThreaddumps);
         }
-        FutureUtils.combineAll(tmLogsFuture)
-                .thenAccept(
-                        tmLogs ->
-                                tmLogs.forEach(
-                                        tmLogOptional ->
-                                                tmLogOptional.ifPresent(
-                                                        this::addTaskManagerLogFile)))
-                .get();
+        // wait for all operations to complete
+        FutureUtils.combineAll(collectionTaskFutures).get();
+    }
+
+    private void addThreadDumps(
+            String name, Collection<ThreadDumpInfo.ThreadInfo> threadDumpInfos) {
+        checkNotNull(logArchiver, "Assuming log archiver to be set");
+        StringBuffer sb = new StringBuffer();
+        for (ThreadDumpInfo.ThreadInfo threadInfo : threadDumpInfos) {
+            sb.append(threadInfo.toString());
+        }
+
+        byte[] entry = sb.toString().getBytes(StandardCharsets.UTF_8);
+        try (InputStream input = new ByteArrayInputStream(entry)) {
+            logArchiver.addArchiveEntry(name + ".threaddump", input, entry.length);
+        } catch (IOException e) {
+            log.warn("Error while collecting thread dumps for {}", name, e);
+        }
     }
 
     private CompletableFuture<Optional<TaskManagerLogAndId>> requestLogs(
