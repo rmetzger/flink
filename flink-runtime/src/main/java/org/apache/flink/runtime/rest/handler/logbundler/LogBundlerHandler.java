@@ -77,7 +77,8 @@ import static org.apache.flink.util.Preconditions.checkState;
 public class LogBundlerHandler
         extends AbstractHandler<RestfulGateway, EmptyRequestBody, LogBundlerMessageParameters> {
 
-    private final Time rpcTimeout = Time.seconds(10);
+    // set high timeout for uploading files to the blob store
+    private final Time rpcTimeout = Time.minutes(1);
     private final Object statusLock = new Object();
     private final ScheduledExecutorService executor;
     private final GatewayRetriever<ResourceManagerGateway> resourceManagerGatewayRetriever;
