@@ -28,6 +28,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -38,6 +40,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
@@ -115,5 +118,37 @@ public class LogArchiverTest extends TestLogger {
         assertThat(
                 LogArchiver.getNextEntryName("jobmanager-test.log.3.4.2.3"),
                 is("jobmanager-test.log.3.4.2.4"));
+    }
+
+    @Test
+    public void testCopy_full() throws IOException {
+        byte[] input = new byte[10000];
+        InputStream inputStream = new ByteArrayInputStream(input);
+        ByteArrayOutputStream bao = new ByteArrayOutputStream();
+        LogArchiver.copyWithLimit(inputStream, bao, input.length);
+
+        assertThat(bao.size(), equalTo(input.length));
+    }
+
+    @Test
+    public void testCopy_limited() throws IOException {
+        int limit = 100;
+        byte[] input = new byte[10000];
+        InputStream inputStream = new ByteArrayInputStream(input);
+        ByteArrayOutputStream bao = new ByteArrayOutputStream();
+        LogArchiver.copyWithLimit(inputStream, bao, limit);
+
+        assertThat(bao.size(), equalTo(limit));
+    }
+
+    @Test
+    public void testCopy_limited2() throws IOException {
+        int limit = 8100;
+        byte[] input = new byte[10000];
+        InputStream inputStream = new ByteArrayInputStream(input);
+        ByteArrayOutputStream bao = new ByteArrayOutputStream();
+        LogArchiver.copyWithLimit(inputStream, bao, limit);
+
+        assertThat(bao.size(), equalTo(limit));
     }
 }

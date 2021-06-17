@@ -277,7 +277,8 @@ public class LogBundlerHandler
 
         byte[] entry = sb.toString().getBytes(StandardCharsets.UTF_8);
         try (InputStream input = new ByteArrayInputStream(entry)) {
-            logArchiver.addArchiveEntry(name + ".threaddump", input, entry.length);
+            logArchiver.addArchiveEntry(
+                    name + ".threaddump", input, entry.length, System.currentTimeMillis());
         } catch (IOException e) {
             log.warn("Error while collecting thread dumps for {}", name, e);
         }
@@ -324,6 +325,8 @@ public class LogBundlerHandler
             return;
         }
         for (File localLogFile : localLogFiles) {
+            // copy file to avoid concurrent: File tempFile = File.createTempFile("prefix-",
+            // "-suffix");
             logArchiver.addArchiveEntry(localLogFile.getName(), localLogFile);
         }
     }
