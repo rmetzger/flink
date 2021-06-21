@@ -89,8 +89,8 @@ public class OperatorEventSendingCheckpointITCase extends TestLogger {
     @BeforeClass
     public static void setupMiniClusterAndEnv() throws Exception {
         Configuration config = new Configuration();
+        // uncomment to run test with adaptive scheduler
         config.set(JobManagerOptions.SCHEDULER, JobManagerOptions.SchedulerType.Adaptive);
-        // config.set(JobManagerOptions.EXECUTION_FAILOVER_STRATEGY, "full");
         flinkCluster = new MiniClusterWithRpcIntercepting(PARALLELISM, config);
         flinkCluster.start();
         TestStreamEnvironment.setAsContext(flinkCluster, PARALLELISM);
@@ -218,13 +218,10 @@ public class OperatorEventSendingCheckpointITCase extends TestLogger {
                                 "numbers")
                         .map(
                                 new MapFunction<Long, Long>() {
-                                    private final Logger LOG =
-                                            LoggerFactory.getLogger(this.getClass());
                                     private int num;
 
                                     @Override
                                     public Long map(Long value) throws Exception {
-                                        LOG.info("num={} failAt={} value={}", num, failAt, value);
                                         if (++num > failAt) {
                                             throw new Exception("Artificial intermittent failure.");
                                         }
@@ -257,7 +254,6 @@ public class OperatorEventSendingCheckpointITCase extends TestLogger {
                                 });
         env.execute();
 
-        // for debugging, disable collection source to avoid noise in the logs
         final List<Long> sequence = numbers.executeAndCollect(numElements);
         // the recovery may change the order of splits, so the sequence might be out-of-order
         sequence.sort(Long::compareTo);
@@ -305,13 +301,11 @@ public class OperatorEventSendingCheckpointITCase extends TestLogger {
 
         @Override
         public void handleSplitRequest(int subtaskId, @Nullable String requesterHostname) {
-            LOG.info("handleSplitRequest s={} r={}", subtaskId, requesterHostname);
             pendingRequests.add(subtaskId);
         }
 
         @Override
         public Collection<SplitT> snapshotState(long checkpointId) throws Exception {
-            LOG.info("snapshotState. pending requests = {}", pendingRequests);
             // this will be enqueued in the enumerator thread, so it will actually run after this
             // method (the snapshot operation) is complete!
             context.runInCoordinatorThread(this::fullFillPendingRequests);
@@ -389,7 +383,6 @@ public class OperatorEventSendingCheckpointITCase extends TestLogger {
             if (o instanceof AddSplitEvent || o instanceof NoMoreSplitsEvent) {
                 // only deal with split related events here
                 if (eventsToFilter.contains(++eventNum)) {
-                    LoggerFactory.getLogger(this.getClass()).info("Filtering event {}", o);
                     return actionForFilteredEvent.handleEvent(task, operator, evt, rpcHandler);
                 }
             }

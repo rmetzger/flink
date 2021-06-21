@@ -37,8 +37,6 @@ import org.apache.flink.core.memory.DataOutputSerializer;
 import org.apache.flink.core.memory.DataOutputView;
 import org.apache.flink.util.NumberSequenceIterator;
 
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -189,8 +187,6 @@ public class NumberSequenceSource
 
         @Override
         public NumberSequenceIterator getIterator() {
-            LoggerFactory.getLogger(this.getClass())
-                    .info("getIterator from={} to={} splitId={}", from, to, splitId);
             return new NumberSequenceIterator(from, to);
         }
 

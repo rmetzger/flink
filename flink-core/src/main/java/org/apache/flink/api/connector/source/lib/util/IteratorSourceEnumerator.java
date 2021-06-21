@@ -21,8 +21,6 @@ package org.apache.flink.api.connector.source.lib.util;
 import org.apache.flink.api.connector.source.SplitEnumerator;
 import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 
-import org.slf4j.LoggerFactory;
-
 import javax.annotation.Nullable;
 
 import java.util.ArrayDeque;
@@ -60,8 +58,6 @@ public class IteratorSourceEnumerator<SplitT extends IteratorSourceSplit<?, ?>>
 
     @Override
     public void handleSplitRequest(int subtaskId, @Nullable String requesterHostname) {
-        LoggerFactory.getLogger(this.getClass())
-                .info("IteratorSource.handleSplitRequest s={} r={}", subtaskId, requesterHostname);
         final SplitT nextSplit = remainingSplits.poll();
         if (nextSplit != null) {
             context.assignSplit(nextSplit, subtaskId);
