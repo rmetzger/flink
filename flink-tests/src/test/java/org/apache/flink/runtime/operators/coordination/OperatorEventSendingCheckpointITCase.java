@@ -25,6 +25,7 @@ import org.apache.flink.api.connector.source.SplitEnumeratorContext;
 import org.apache.flink.api.connector.source.lib.NumberSequenceSource;
 import org.apache.flink.api.connector.source.lib.util.IteratorSourceEnumerator;
 import org.apache.flink.api.connector.source.lib.util.IteratorSourceSplit;
+import org.apache.flink.configuration.ClusterOptions;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.JobManagerOptions;
 import org.apache.flink.runtime.akka.AkkaUtils;
@@ -71,6 +72,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.LongStream;
+
+import static org.junit.Assert.assertEquals;
 
 /**
  * A test suite for source enumerator (operator coordinator) for situations where RPC calls for
@@ -80,6 +84,7 @@ public class OperatorEventSendingCheckpointITCase extends TestLogger {
 
     private static final int PARALLELISM = 1;
     private static MiniCluster flinkCluster;
+    private static boolean adaptiveSchedulerEnabled;
 
     @BeforeClass
     public static void setupMiniClusterAndEnv() throws Exception {
@@ -89,6 +94,7 @@ public class OperatorEventSendingCheckpointITCase extends TestLogger {
         flinkCluster = new MiniClusterWithRpcIntercepting(PARALLELISM, config);
         flinkCluster.start();
         TestStreamEnvironment.setAsContext(flinkCluster, PARALLELISM);
+        adaptiveSchedulerEnabled = ClusterOptions.isAdaptiveSchedulerEnabled(config);
     }
 
     @AfterClass
@@ -203,7 +209,7 @@ public class OperatorEventSendingCheckpointITCase extends TestLogger {
 
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setParallelism(1);
-        env.enableCheckpointing(10);
+        env.enableCheckpointing(50);
 
         final DataStream<Long> numbers =
                 env.fromSource(
@@ -222,20 +228,44 @@ public class OperatorEventSendingCheckpointITCase extends TestLogger {
                                         if (++num > failAt) {
                                             throw new Exception("Artificial intermittent failure.");
                                         }
+                                        // This test depends on checkpoints persisting progress from
+                                        // the source before above exception gets triggered.
+                                        // Otherwise, the job will run for a long time (or forever)
+                                        // because above exception will be thrown before any
+                                        // checkpoint successfully completes.
+                                        //
+                                        // Checkpoints are triggered once the checkpoint scheduler
+                                        // gets started + a random initial delay.
+                                        // For DefaultScheduler, this mechanism is fine, because DS
+                                        // starts the checkpoint coordinator, then requests the
+                                        // required slots and then deploys the tasks. These
+                                        // operations take enough time to have a checkpoint
+                                        // triggered by the time the task starts running.
+                                        // AdaptiveScheduler starts the CheckpointCoordinator right
+                                        // before deploying tasks (when slots are available
+                                        // already), hence tasks will start running almost
+                                        // immediately, and the checkpoint gets triggered too late
+                                        // (it won't be able to complete before the artificial
+                                        // failure from this test)
+                                        // When we detect AdaptiveScheduler, we artificially slow
+                                        // down
+                                        if (adaptiveSchedulerEnabled) {
+                                            Thread.sleep(1);
+                                        }
                                         return value;
                                     }
                                 });
         env.execute();
 
         // for debugging, disable collection source to avoid noise in the logs
-        /*final List<Long> sequence = numbers.executeAndCollect(numElements);
+        final List<Long> sequence = numbers.executeAndCollect(numElements);
         // the recovery may change the order of splits, so the sequence might be out-of-order
         sequence.sort(Long::compareTo);
 
         final List<Long> expectedSequence =
                 LongStream.rangeClosed(1L, numElements).boxed().collect(Collectors.toList());
 
-        assertEquals(expectedSequence, sequence); */
+        assertEquals(expectedSequence, sequence);
     }
 
     private static CompletableFuture<Acknowledge> askTimeoutFuture() {
