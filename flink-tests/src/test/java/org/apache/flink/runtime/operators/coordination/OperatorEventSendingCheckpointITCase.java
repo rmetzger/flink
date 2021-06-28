@@ -59,6 +59,8 @@ import akka.actor.ActorSystem;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import javax.annotation.Nullable;
 
@@ -81,6 +83,7 @@ import static org.junit.Assert.assertEquals;
  * A test suite for source enumerator (operator coordinator) for situations where RPC calls for
  * split assignments (operator events) fails from time to time.
  */
+@RunWith(Parameterized.class)
 public class OperatorEventSendingCheckpointITCase extends TestLogger {
 
     private static final int PARALLELISM = 1;
@@ -108,6 +111,11 @@ public class OperatorEventSendingCheckpointITCase extends TestLogger {
     // ------------------------------------------------------------------------
     //  tests
     // ------------------------------------------------------------------------
+
+    @Parameterized.Parameters
+    public static Object[][] data() {
+        return new Object[100][0];
+    }
 
     /**
      * Every second assign split event is lost. Eventually, the enumerator must recognize that an
