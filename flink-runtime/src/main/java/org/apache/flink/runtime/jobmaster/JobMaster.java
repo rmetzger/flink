@@ -946,6 +946,13 @@ public class JobMaster extends PermanentlyFencedRpcEndpoint<JobMasterId>
                 new HashSet<>(registeredTaskManagers.keySet());
 
         for (ResourceID taskManagerResourceId : taskManagerResourceIds) {
+            // TODO HACK
+
+            registeredTaskManagers
+                    .get(taskManagerResourceId)
+                    .f1
+                    .scheduleTermination(0, Time.seconds(1), Time.minutes(5));
+
             disconnectTaskManager(taskManagerResourceId, cause);
         }
 

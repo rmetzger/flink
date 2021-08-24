@@ -224,6 +224,11 @@ public class TaskExecutorGatewayDecoratorBase implements TaskExecutorGateway {
     }
 
     @Override
+    public void scheduleTermination(int exitCode, Time terminateAfter, Time timeout) {
+        originalGateway.scheduleTermination(exitCode, terminateAfter, timeout);
+    }
+
+    @Override
     public CompletableFuture<TaskThreadInfoResponse> requestThreadInfoSamples(
             ExecutionAttemptID taskExecutionAttemptId,
             ThreadInfoSamplesRequest requestParams,

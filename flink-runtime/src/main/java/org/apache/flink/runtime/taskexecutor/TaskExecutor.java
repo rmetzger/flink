@@ -1269,6 +1269,23 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
         return CompletableFuture.completedFuture(ThreadDumpInfo.create(threadInfos));
     }
 
+    @Override
+    public void scheduleTermination(int exitCode, Time terminateAfter, Time timeout) {
+        ioExecutor.execute(
+                () -> {
+                    try {
+                        log.info(
+                                "TaskManager has been requested to terminate with exitCode={}",
+                                exitCode);
+                        Thread.sleep(terminateAfter.toMilliseconds());
+                        log.info("Terminating ...");
+                        System.exit(exitCode);
+                    } catch (Throwable t) {
+                        log.warn("Error while terminating TaskManager", t);
+                    }
+                });
+    }
+
     // ------------------------------------------------------------------------
     //  Internal resource manager connection methods
     // ------------------------------------------------------------------------

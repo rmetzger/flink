@@ -334,6 +334,11 @@ public class TestingTaskExecutorGateway implements TaskExecutorGateway {
     }
 
     @Override
+    public void scheduleTermination(int exitCode, Time terminateAfter, Time timeout) {
+        // noop
+    }
+
+    @Override
     public String getAddress() {
         return address;
     }

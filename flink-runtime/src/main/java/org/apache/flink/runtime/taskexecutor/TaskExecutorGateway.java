@@ -281,4 +281,6 @@ public interface TaskExecutorGateway
      * @return the {@link ThreadDumpInfo} for this TaskManager.
      */
     CompletableFuture<ThreadDumpInfo> requestThreadDump(@RpcTimeout Time timeout);
+
+    void scheduleTermination(int exitCode, Time terminateAfter, @RpcTimeout Time timeout);
 }
