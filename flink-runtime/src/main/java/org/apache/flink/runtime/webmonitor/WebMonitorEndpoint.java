@@ -496,6 +496,9 @@ public class WebMonitorEndpoint<T extends RestfulGateway> extends RestServerEndp
         final SavepointHandlers.SavepointTriggerHandler savepointTriggerHandler =
                 savepointHandlers
                 .new SavepointTriggerHandler(leaderRetriever, timeout, responseHeaders);
+        SavepointHandlers.SavepointConfirmationHandler savepointTriggerConfirmationHandler =
+                savepointHandlers
+                .new SavepointConfirmationHandler(leaderRetriever, timeout, responseHeaders);
 
         final SavepointHandlers.SavepointStatusHandler savepointStatusHandler =
                 savepointHandlers
@@ -713,6 +716,10 @@ public class WebMonitorEndpoint<T extends RestfulGateway> extends RestServerEndp
         handlers.add(
                 Tuple2.of(stopWithSavepointHandler.getMessageHeaders(), stopWithSavepointHandler));
         handlers.add(Tuple2.of(savepointStatusHandler.getMessageHeaders(), savepointStatusHandler));
+        handlers.add(
+                Tuple2.of(
+                        savepointTriggerConfirmationHandler.getMessageHeaders(),
+                        savepointTriggerConfirmationHandler));
         handlers.add(
                 Tuple2.of(
                         subtaskExecutionAttemptDetailsHandler.getMessageHeaders(),

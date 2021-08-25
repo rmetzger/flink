@@ -54,9 +54,10 @@ import static org.apache.flink.util.Preconditions.checkState;
  * operations will be removed from the cache automatically after a fixed timeout.
  */
 @ThreadSafe
-class CompletedOperationCache<K extends OperationKey, R> implements AutoCloseableAsync {
+public class CompletedOperationCache<K extends OperationKey, R> implements AutoCloseableAsync {
 
-    private static final long COMPLETED_OPERATION_RESULT_CACHE_DURATION_SECONDS = 300L;
+    private static final long COMPLETED_OPERATION_RESULT_CACHE_DURATION_SECONDS =
+            86400; // TODO r7r hack: keep for 24 hours
 
     private static final Logger LOGGER = LoggerFactory.getLogger(CompletedOperationCache.class);
 

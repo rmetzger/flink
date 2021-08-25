@@ -21,12 +21,14 @@ package org.apache.flink.runtime.rest.handler.job.savepoints;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.CheckpointingOptions;
+import org.apache.flink.runtime.rest.handler.AbstractRestHandler;
 import org.apache.flink.runtime.rest.handler.HandlerRequest;
 import org.apache.flink.runtime.rest.handler.RestHandlerException;
 import org.apache.flink.runtime.rest.handler.async.AbstractAsynchronousOperationHandlers;
 import org.apache.flink.runtime.rest.handler.async.TriggerResponse;
 import org.apache.flink.runtime.rest.handler.job.AsynchronousJobOperationKey;
 import org.apache.flink.runtime.rest.messages.EmptyRequestBody;
+import org.apache.flink.runtime.rest.messages.EmptyResponseBody;
 import org.apache.flink.runtime.rest.messages.JobIDPathParameter;
 import org.apache.flink.runtime.rest.messages.MessageHeaders;
 import org.apache.flink.runtime.rest.messages.RequestBody;
@@ -47,6 +49,7 @@ import org.apache.flink.util.SerializedThrowable;
 
 import org.apache.flink.shaded.netty4.io.netty.handler.codec.http.HttpResponseStatus;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 import java.util.Map;
@@ -107,6 +110,8 @@ public class SavepointHandlers
         extends AbstractAsynchronousOperationHandlers<AsynchronousJobOperationKey, String> {
 
     @Nullable private final String defaultSavepointDir;
+
+    private final CompletableFuture<Void> resultRetrievalConfirmed = new CompletableFuture<>();
 
     public SavepointHandlers(@Nullable final String defaultSavepointDir) {
         this.defaultSavepointDir = defaultSavepointDir;
@@ -177,6 +182,41 @@ public class SavepointHandlers
         }
     }
 
+    public class SavepointConfirmationHandler
+            extends AbstractRestHandler<
+                    RestfulGateway,
+                    EmptyRequestBody,
+                    EmptyResponseBody,
+                    SavepointConfirmationMessageParameters> {
+        public SavepointConfirmationHandler(
+                GatewayRetriever<? extends RestfulGateway> leaderRetriever,
+                Time timeout,
+                Map<String, String> responseHeaders) {
+            super(
+                    leaderRetriever,
+                    timeout,
+                    responseHeaders,
+                    StopWithSavepointConfirmationHeaders.getInstance());
+        }
+
+        @Override
+        protected CompletableFuture<EmptyResponseBody> handleRequest(
+                @Nonnull
+                        HandlerRequest<EmptyRequestBody, SavepointConfirmationMessageParameters>
+                                request,
+                @Nonnull RestfulGateway gateway)
+                throws RestHandlerException {
+            log.info("Result retrieval confirmed.");
+            resultRetrievalConfirmed.complete(null);
+            return CompletableFuture.completedFuture(EmptyResponseBody.getInstance());
+        }
+
+        @Override
+        protected CompletableFuture<Void> closeHandlerAsync() {
+            return resultRetrievalConfirmed;
+        }
+    }
+
     /** HTTP handler to trigger savepoints. */
     public class SavepointTriggerHandler extends SavepointHandlerBase<SavepointTriggerRequestBody> {
 
@@ -242,6 +282,11 @@ public class SavepointHandlers
         @Override
         protected SavepointInfo operationResultResponse(String operationResult) {
             return new SavepointInfo(operationResult, null);
+        }
+
+        @Override
+        public CompletableFuture<Void> closeHandlerAsync() {
+            return resultRetrievalConfirmed;
         }
     }
 }

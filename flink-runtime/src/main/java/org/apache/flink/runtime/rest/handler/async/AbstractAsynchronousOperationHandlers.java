@@ -88,7 +88,7 @@ import java.util.concurrent.CompletableFuture;
  */
 public abstract class AbstractAsynchronousOperationHandlers<K extends OperationKey, R> {
 
-    private final CompletedOperationCache<K, R> completedOperationCache =
+    protected final CompletedOperationCache<K, R> completedOperationCache =
             new CompletedOperationCache<>();
 
     /**

@@ -120,6 +120,7 @@ public class WebFrontendITCase extends TestLogger {
 
     @Test
     public void getFrontPage() throws Exception {
+        Thread.sleep(500000);
         String fromHTTP =
                 TestBaseUtils.getFromHTTP("http://localhost:" + getRestPort() + "/index.html");
         assertThat(fromHTTP, containsString("Apache Flink Web Dashboard"));
