@@ -111,7 +111,7 @@ public class SavepointHandlers
 
     @Nullable private final String defaultSavepointDir;
 
-    private final CompletableFuture<Void> resultRetrievalConfirmed = new CompletableFuture<>();
+    private CompletableFuture<Void> resultRetrievalConfirmed;
 
     public SavepointHandlers(@Nullable final String defaultSavepointDir) {
         this.defaultSavepointDir = defaultSavepointDir;
@@ -172,6 +172,9 @@ public class SavepointHandlers
                         HttpResponseStatus.BAD_REQUEST);
             }
 
+            resultRetrievalConfirmed = new CompletableFuture<>();
+            log.info("Setting wait future");
+
             final boolean shouldDrain = request.getRequestBody().shouldDrain();
             final String targetDirectory =
                     requestedTargetDirectory != null
@@ -206,13 +209,18 @@ public class SavepointHandlers
                                 request,
                 @Nonnull RestfulGateway gateway)
                 throws RestHandlerException {
-            log.info("Result retrieval confirmed.");
-            resultRetrievalConfirmed.complete(null);
+            log.info("Result retrieval confirmed: " + resultRetrievalConfirmed);
+            if (resultRetrievalConfirmed != null) {
+                resultRetrievalConfirmed.complete(null);
+            }
             return CompletableFuture.completedFuture(EmptyResponseBody.getInstance());
         }
 
         @Override
         protected CompletableFuture<Void> closeHandlerAsync() {
+            if (resultRetrievalConfirmed == null) {
+                return CompletableFuture.completedFuture(null);
+            }
             return resultRetrievalConfirmed;
         }
     }
@@ -286,6 +294,9 @@ public class SavepointHandlers
 
         @Override
         public CompletableFuture<Void> closeHandlerAsync() {
+            if (resultRetrievalConfirmed == null) {
+                return CompletableFuture.completedFuture(null);
+            }
             return resultRetrievalConfirmed;
         }
     }
