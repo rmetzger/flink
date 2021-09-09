@@ -149,6 +149,11 @@ public class ClusterOptions {
                                     UncaughtExceptionHandleMode.LOG.name(),
                                     UncaughtExceptionHandleMode.FAIL.name()));
 
+    public static final ConfigOption<Boolean> APPLICATION_MODE_KEEP_ALIVE =
+            ConfigOptions.key("cluster.application-mode.keep-alive")
+                    .booleanType()
+                    .defaultValue(true);
+
     public static JobManagerOptions.SchedulerType getSchedulerType(Configuration configuration) {
         if (isAdaptiveSchedulerEnabled(configuration) || isReactiveModeEnabled(configuration)) {
             return JobManagerOptions.SchedulerType.Adaptive;

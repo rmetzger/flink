@@ -53,6 +53,9 @@ public class ShutdownHandler
             @Nonnull final HandlerRequest<EmptyRequestBody, EmptyMessageParameters> request,
             @Nonnull final RestfulGateway gateway)
             throws RestHandlerException {
+        // I said hacking, right?
+        // System.exit(0);
+        // return CompletableFuture.completedFuture(EmptyResponseBody.getInstance());
         return gateway.shutDownCluster().thenApply(ignored -> EmptyResponseBody.getInstance());
     }
 }

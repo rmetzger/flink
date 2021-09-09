@@ -27,6 +27,7 @@ import org.apache.flink.client.cli.ClientOptions;
 import org.apache.flink.client.deployment.application.executors.EmbeddedExecutor;
 import org.apache.flink.client.deployment.application.executors.EmbeddedExecutorServiceLoader;
 import org.apache.flink.client.program.PackagedProgram;
+import org.apache.flink.configuration.ClusterOptions;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.PipelineOptionsInternal;
 import org.apache.flink.core.execution.PipelineExecutorServiceLoader;
@@ -151,7 +152,13 @@ public class ApplicationDispatcherBootstrap implements DispatcherBootstrap {
                 .handle(
                         (ignored, t) -> {
                             if (t == null) {
-                                LOG.info("Application completed SUCCESSFULLY");
+                                LOG.info("Application completed SUCCESSFULLY.");
+                                if (configuration.getBoolean(
+                                        ClusterOptions.APPLICATION_MODE_KEEP_ALIVE)) {
+                                    LOG.info(
+                                            "Application mode keep alive is configured. Awaiting further instructions, such as a DELETE /cluster call \uD83D\uDE0A");
+                                    return CompletableFuture.completedFuture(Acknowledge.get());
+                                }
                                 return dispatcherGateway.shutDownCluster(
                                         ApplicationStatus.SUCCEEDED);
                             }
