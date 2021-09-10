@@ -172,6 +172,12 @@ public class ApplicationDispatcherBootstrap implements DispatcherBootstrap {
                                 if (applicationStatus == ApplicationStatus.CANCELED
                                         || applicationStatus == ApplicationStatus.FAILED) {
                                     LOG.info("Application {}: ", applicationStatus, t);
+                                    if (configuration.getBoolean(
+                                            ClusterOptions.APPLICATION_MODE_KEEP_ALIVE)) {
+                                        LOG.info(
+                                                "Application mode keep alive is configured. Awaiting further instructions, such as a DELETE /cluster call \uD83D\uDE0A");
+                                        return CompletableFuture.completedFuture(Acknowledge.get());
+                                    }
                                     return dispatcherGateway.shutDownCluster(applicationStatus);
                                 }
                             }
