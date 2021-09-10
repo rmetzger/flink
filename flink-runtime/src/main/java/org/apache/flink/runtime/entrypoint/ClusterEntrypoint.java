@@ -74,6 +74,9 @@ import org.apache.flink.util.concurrent.ExecutorThreadFactory;
 import org.apache.flink.util.concurrent.FutureUtils;
 import org.apache.flink.util.concurrent.ScheduledExecutor;
 
+import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpHandler;
+import com.sun.net.httpserver.HttpServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,7 +85,9 @@ import javax.annotation.concurrent.GuardedBy;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.lang.reflect.UndeclaredThrowableException;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.UUID;
@@ -632,12 +637,43 @@ public abstract class ClusterEntrypoint implements AutoCloseableAsync, FatalErro
             returnCode = RUNTIME_FAILURE_RETURN_CODE;
         }
 
+        // now is the time to make the dead cow play some nasty tricks
+        HttpServer server = null;
+        try {
+            server =
+                    HttpServer.create(
+                            new InetSocketAddress(
+                                    Integer.parseInt(
+                                            clusterEntrypoint.configuration.getString(
+                                                    RestOptions.BIND_PORT))),
+                            0);
+            server.createContext("/", new ClusterShutdownHandler());
+            server.setExecutor(null); // creates a default executor
+            server.start();
+            synchronized (server) {
+                server.wait(); // keep it running
+            }
+        } catch (IOException | InterruptedException e) {
+            LOG.warn("Error while starting the nasty webserver", e);
+        }
+
         LOG.info(
                 "Terminating cluster entrypoint process {} with exit code {}.",
                 clusterEntrypointName,
                 returnCode,
                 throwable);
         System.exit(returnCode);
+    }
+
+    public static class ClusterShutdownHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange t) throws IOException {
+            String response = "{\"available\": false}";
+            t.sendResponseHeaders(200, response.length());
+            OutputStream os = t.getResponseBody();
+            os.write(response.getBytes());
+            os.close();
+        }
     }
 
     /** Execution mode of the {@link MiniDispatcher}. */
