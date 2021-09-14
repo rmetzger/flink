@@ -44,6 +44,9 @@ public class ClusterOverview extends JobsOverview {
     @JsonProperty(FIELD_NAME_SLOTS_AVAILABLE)
     private final int numSlotsAvailable;
 
+    @JsonProperty("available")
+    private final boolean available = true;
+
     @JsonCreator
     public ClusterOverview(
             @JsonProperty(FIELD_NAME_TASKMANAGERS) int numTaskManagersConnected,
@@ -94,6 +97,10 @@ public class ClusterOverview extends JobsOverview {
 
     public int getNumSlotsAvailable() {
         return numSlotsAvailable;
+    }
+
+    public boolean isAvailable() {
+        return available;
     }
 
     // ------------------------------------------------------------------------
