@@ -346,8 +346,7 @@ public class CheckpointStatsTracker {
             "lastCheckpointRestoreTimestamp";
 
     @VisibleForTesting
-    static final String LATEST_SUCCESSFUL_CHECKPOINT_TIMESTAMP_METRIC =
-            "lastSuccessfulCheckpointTimestamp";
+    static final String MS_SINCE_SUCCESSFUL_CHECKPOINT = "msSinceSuccessfulCheckpoint";
 
     @VisibleForTesting
     static final String LATEST_COMPLETED_CHECKPOINT_SIZE_METRIC = "lastCheckpointSize";
@@ -382,9 +381,7 @@ public class CheckpointStatsTracker {
         metricGroup.gauge(
                 LATEST_RESTORED_CHECKPOINT_TIMESTAMP_METRIC,
                 new LatestRestoredCheckpointTimestampGauge());
-        metricGroup.gauge(
-                LATEST_SUCCESSFUL_CHECKPOINT_TIMESTAMP_METRIC,
-                new LastSuccessfulCheckpointTimestampGauge());
+        metricGroup.gauge(MS_SINCE_SUCCESSFUL_CHECKPOINT, new TimeSinceSuccessfulCheckpointGauge());
 
         metricGroup.gauge(
                 LATEST_COMPLETED_CHECKPOINT_SIZE_METRIC, new LatestCompletedCheckpointSizeGauge());
@@ -442,12 +439,12 @@ public class CheckpointStatsTracker {
         }
     }
 
-    private class LastSuccessfulCheckpointTimestampGauge implements Gauge<Long> {
+    private class TimeSinceSuccessfulCheckpointGauge implements Gauge<Long> {
         @Override
         public Long getValue() {
             CompletedCheckpointStats chkp = latestCompletedCheckpoint;
             if (chkp != null) {
-                return chkp.getLatestAckTimestamp();
+                return System.currentTimeMillis() - chkp.getLatestAckTimestamp();
             } else {
                 return -1L;
             }
