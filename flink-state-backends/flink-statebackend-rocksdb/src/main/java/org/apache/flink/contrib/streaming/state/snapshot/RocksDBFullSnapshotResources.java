@@ -165,6 +165,7 @@ public class RocksDBFullSnapshotResources<K> implements FullSnapshotResources<K>
 
         try {
             ReadOptions readOptions = new ReadOptions();
+            readOptions.setFillCache(false);
             closeableRegistry.registerCloseable(readOptions::close);
             readOptions.setSnapshot(snapshot);
 
