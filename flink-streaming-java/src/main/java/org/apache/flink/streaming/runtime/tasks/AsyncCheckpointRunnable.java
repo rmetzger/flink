@@ -214,6 +214,12 @@ final class AsyncCheckpointRunnable implements Runnable, Closeable {
                 "Found cached state but no corresponding primary state is reported to the job "
                         + "manager. This indicates a problem.");
 
+        LOG.info(
+                "{} - reported the following states in snapshot for checkpoint {}: {}.",
+                taskName,
+                checkpointMetaData.getCheckpointId(),
+                acknowledgedTaskStateSnapshot);
+
         // we signal stateless tasks by reporting null, so that there are no attempts to assign
         // empty state
         // to stateless tasks on restore. This enables simple job modifications that only concern
@@ -234,12 +240,6 @@ final class AsyncCheckpointRunnable implements Runnable, Closeable {
                 taskName,
                 checkpointMetaData.getCheckpointId(),
                 asyncDurationMillis);
-
-        LOG.trace(
-                "{} - reported the following states in snapshot for checkpoint {}: {}.",
-                taskName,
-                checkpointMetaData.getCheckpointId(),
-                acknowledgedTaskStateSnapshot);
     }
 
     private void reportAbortedSnapshotStats(long stateSize) {
