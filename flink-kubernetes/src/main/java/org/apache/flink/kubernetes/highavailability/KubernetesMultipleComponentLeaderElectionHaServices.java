@@ -42,6 +42,9 @@ import org.apache.flink.util.ExecutorUtils;
 import org.apache.flink.util.FlinkRuntimeException;
 import org.apache.flink.util.concurrent.ExecutorThreadFactory;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 
@@ -58,6 +61,7 @@ import static org.apache.flink.util.Preconditions.checkNotNull;
 
 /** Kubernetes HA services that use a single leader election service per JobManager. */
 public class KubernetesMultipleComponentLeaderElectionHaServices extends AbstractHaServices {
+    private static final Logger LOG = LoggerFactory.getLogger(KubernetesMultipleComponentLeaderElectionHaServices.class);
 
     private final Object lock = new Object();
 
