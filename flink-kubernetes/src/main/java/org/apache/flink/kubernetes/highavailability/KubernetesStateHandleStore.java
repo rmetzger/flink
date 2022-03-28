@@ -131,6 +131,7 @@ public class KubernetesStateHandleStore<T extends Serializable>
 
         @Override
         public void discardState() throws Exception {
+            LOG.info("ROB: inner.discardState()");
             inner.discardState();
         }
 
@@ -144,6 +145,7 @@ public class KubernetesStateHandleStore<T extends Serializable>
         }
 
         boolean isMarkedForDeletion() {
+            LOG.info("ROB: isMarkedForDeletion(): " + markedForDeletion);
             return markedForDeletion;
         }
 
@@ -227,6 +229,8 @@ public class KubernetesStateHandleStore<T extends Serializable>
                             .get();
             return storeHandle;
         } catch (Exception ex) {
+            LOG.info("ROB: Exception during add operation", ex);
+
             final Optional<PossibleInconsistentStateException> possibleInconsistentStateException =
                     ExceptionUtils.findThrowable(ex, PossibleInconsistentStateException.class);
             if (possibleInconsistentStateException.isPresent()) {
@@ -240,6 +244,7 @@ public class KubernetesStateHandleStore<T extends Serializable>
                     .orElseThrow(() -> ex);
         } finally {
             if (discardState) {
+                LOG.info("ROB: addAndLock():discarding state");
                 storeHandle.discardState();
             }
         }
@@ -310,10 +315,12 @@ public class KubernetesStateHandleStore<T extends Serializable>
             throw ExceptionUtils.findThrowable(ex, NotExistException.class).orElseThrow(() -> ex);
         } finally {
             if (discardNewState) {
+                LOG.info("ROB: replace():discarding new state");
                 newStateHandle.discardState();
             }
 
             if (discardOldState) {
+                LOG.info("ROB: replace():discarding old state");
                 Objects.requireNonNull(
                                 oldStateHandleRef.get(),
                                 "state handle should have been set on success")
@@ -471,6 +478,8 @@ public class KubernetesStateHandleStore<T extends Serializable>
     @Override
     public boolean releaseAndTryRemove(String key) throws Exception {
         checkNotNull(key, "Key in ConfigMap.");
+        LOG.info("ROB: releaseAndTryRemove()", new RuntimeException("Just to see caller"));
+
         final AtomicReference<RetrievableStateHandle<T>> stateHandleRefer = new AtomicReference<>();
         final AtomicBoolean stateHandleDoesNotExist = new AtomicBoolean(false);
         return updateConfigMap(
@@ -533,6 +542,8 @@ public class KubernetesStateHandleStore<T extends Serializable>
      */
     @Override
     public void releaseAndTryRemoveAll() throws Exception {
+        LOG.info("ROB: releaseAndTryRemoveAll()", new RuntimeException("Just to see caller"));
+
         final Map<String, RetrievableStateHandle<T>> validStateHandles = new HashMap<>();
         updateConfigMap(
                         configMap -> {
@@ -635,7 +646,13 @@ public class KubernetesStateHandleStore<T extends Serializable>
                 configMapName,
                 configMap -> {
                     if (isValidOperation(configMap)) {
-                        return updateFn.apply(configMap);
+                        Optional<KubernetesConfigMap> res = updateFn.apply(configMap);
+                        LOG.info("ROB: updateConfigMap(): " + res);
+                        if (res.isPresent()) {
+                            LOG.info("ROB: updateConfigMap(): " + res.get().getData());
+                        }
+
+                        return res;
                     }
                     return Optional.empty();
                 });
@@ -650,6 +667,7 @@ public class KubernetesStateHandleStore<T extends Serializable>
             throws Exception {
         final String content = configMap.getData().get(key);
         if (content != null) {
+            LOG.info("ROB: addEntry(): " + configMap.getData());
             try {
                 final StateHandleWithDeleteMarker<T> stateHandle = deserializeStateHandle(content);
                 if (stateHandle.isMarkedForDeletion()) {
@@ -668,6 +686,7 @@ public class KubernetesStateHandleStore<T extends Serializable>
                 logInvalidEntry(key, configMapName, e);
             }
         }
+
         configMap.getData().put(key, toBase64(serializedStateHandle));
         return Optional.of(configMap);
     }
@@ -684,6 +703,7 @@ public class KubernetesStateHandleStore<T extends Serializable>
             throws NotExistException {
         final String content = configMap.getData().get(key);
         if (content != null) {
+            LOG.info("ROB: replaceEntry(): " + configMap.getData());
             try {
                 final StateHandleWithDeleteMarker<T> stateHandle = deserializeStateHandle(content);
                 oldStateHandleRef.set(stateHandle.getInner());
@@ -703,6 +723,8 @@ public class KubernetesStateHandleStore<T extends Serializable>
                 logInvalidEntry(key, configMapName, e);
             }
             configMap.getData().put(key, toBase64(serializedStateHandle));
+            LOG.info("ROB: replaceEntry(): final " + configMap.getData());
+
             return Optional.of(configMap);
         }
         throw getKeyNotExistException(key);
