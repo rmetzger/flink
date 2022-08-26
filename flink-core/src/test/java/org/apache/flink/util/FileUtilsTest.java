@@ -475,7 +475,8 @@ public class FileUtilsTest extends TestLogger {
         out.putNextEntry(e);
         out.close();
 
-        FileUtils.expandDirectory(new Path(test.getAbsolutePath()), new Path(tmp.newFolder().getAbsolutePath()));
+        FileUtils.expandDirectory(
+                new Path(test.getAbsolutePath()), new Path(tmp.newFolder().getAbsolutePath()));
     }
 
     /**
