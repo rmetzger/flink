@@ -48,6 +48,8 @@ import java.util.List;
 import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
@@ -463,6 +465,17 @@ public class FileUtilsTest extends TestLogger {
         FileUtils.expandDirectory(zip, new Path(extractDir.toAbsolutePath().toString()));
 
         assertDirEquals(compressDir.resolve(originalDir), extractDir.resolve(originalDir));
+    }
+
+    @Test(expected = IOException.class)
+    public void testExpandDirectoryWithIllegalCharacters() throws IOException {
+        File test = tmp.newFile();
+        ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(test.toPath()));
+        ZipEntry e = new ZipEntry("../../mytext.txt");
+        out.putNextEntry(e);
+        out.close();
+
+        FileUtils.expandDirectory(new Path(test.getAbsolutePath()), new Path(tmp.newFolder().getAbsolutePath()));
     }
 
     /**

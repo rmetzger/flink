@@ -522,6 +522,9 @@ public final class FileUtils {
         try (ZipInputStream zis = new ZipInputStream(sourceFs.open(file))) {
             ZipEntry entry;
             while ((entry = zis.getNextEntry()) != null) {
+                if (entry.getName().contains(".."+File.separatorChar)) {
+                    throw new IOException("Zip entry contains illegal characters: " + entry.getName());
+                }
                 Path relativePath = new Path(entry.getName());
                 if (rootDir == null) {
                     // the first entry contains the name of the original directory that was zipped
