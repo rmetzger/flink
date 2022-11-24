@@ -47,6 +47,10 @@ echo "==========================================================================
 
 EXIT_CODE=0
 
+echo "++++ DEBUG"
+find .
+echo "+++ DEBUG DONE"
+
 run_mvn clean deploy -DaltDeploymentRepository=validation_repository::default::file:$MVN_VALIDATION_DIR -Dflink.convergence.phase=install -Pcheck-convergence \
     -Dmaven.javadoc.skip=true -U -DskipTests | tee $MVN_CLEAN_COMPILE_OUT
 

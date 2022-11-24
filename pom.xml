@@ -1535,6 +1535,7 @@ under the License.
 						<!-- Generated content -->
 						<exclude>out/**</exclude>
 						<exclude>**/target/**</exclude>
+						<exclude>/target/**</exclude>
 						<exclude>build-target/**</exclude>
 						<exclude>docs/layouts/shortcodes/generated/**</exclude>
 						<exclude>docs/static/generated/**</exclude>
