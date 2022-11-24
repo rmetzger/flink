@@ -1373,7 +1373,7 @@ under the License.
 			<plugin>
 				<groupId>org.apache.rat</groupId>
 				<artifactId>apache-rat-plugin</artifactId>
-				<version>0.13</version>
+				<version>0.15</version>
 				<inherited>false</inherited>
 				<executions>
 					<execution>
@@ -1535,7 +1535,6 @@ under the License.
 						<!-- Generated content -->
 						<exclude>out/**</exclude>
 						<exclude>**/target/**</exclude>
-						<exclude>/target/**</exclude>
 						<exclude>build-target/**</exclude>
 						<exclude>docs/layouts/shortcodes/generated/**</exclude>
 						<exclude>docs/static/generated/**</exclude>

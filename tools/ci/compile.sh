@@ -56,6 +56,10 @@ run_mvn clean deploy -DaltDeploymentRepository=validation_repository::default::f
 
 EXIT_CODE=${PIPESTATUS[0]}
 
+echo "++++ DEBUG2"
+find .
+echo "+++ DEBUG2 DONE"
+
 if [ $EXIT_CODE != 0 ]; then
     echo "=============================================================================="
     echo "Compiling Flink failed."
