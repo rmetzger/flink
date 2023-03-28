@@ -466,20 +466,28 @@ public class MiniCluster implements AutoCloseableAsync {
                 clusterRestEndpointLeaderRetrievalService =
                         haServices.getClusterRestEndpointLeaderRetriever();
 
+                final Duration minDelay =
+                        configuration.get(
+                                MiniClusterConfiguration.GATEWAY_RETRIEVER_INITIAL_BACKOFF);
+                final Duration maxDelay =
+                        configuration.get(MiniClusterConfiguration.GATEWAY_RETRIEVER_MAX_BACKOFF);
+                final int maxAttempts =
+                        configuration.get(MiniClusterConfiguration.GATEWAY_RETRIEVER_MAX_ATTEMPTS);
+
                 dispatcherGatewayRetriever =
                         new RpcGatewayRetriever<>(
                                 commonRpcService,
                                 DispatcherGateway.class,
                                 DispatcherId::fromUuid,
                                 new ExponentialBackoffRetryStrategy(
-                                        21, Duration.ofMillis(5L), Duration.ofMillis(20L)));
+                                        maxAttempts, minDelay, maxDelay));
                 resourceManagerGatewayRetriever =
                         new RpcGatewayRetriever<>(
                                 commonRpcService,
                                 ResourceManagerGateway.class,
                                 ResourceManagerId::fromUuid,
                                 new ExponentialBackoffRetryStrategy(
-                                        21, Duration.ofMillis(5L), Duration.ofMillis(20L)));
+                                        maxAttempts, minDelay, maxDelay));
                 webMonitorLeaderRetriever = new LeaderRetriever();
 
                 resourceManagerLeaderRetriever.start(resourceManagerGatewayRetriever);

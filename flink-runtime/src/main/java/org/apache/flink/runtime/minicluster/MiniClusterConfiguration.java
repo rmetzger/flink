@@ -18,14 +18,8 @@
 
 package org.apache.flink.runtime.minicluster;
 
-import org.apache.flink.configuration.AkkaOptions;
-import org.apache.flink.configuration.ClusterOptions;
-import org.apache.flink.configuration.Configuration;
-import org.apache.flink.configuration.JobManagerOptions;
-import org.apache.flink.configuration.NettyShuffleEnvironmentOptions;
-import org.apache.flink.configuration.RestOptions;
-import org.apache.flink.configuration.TaskManagerOptions;
-import org.apache.flink.configuration.UnmodifiableConfiguration;
+import org.apache.flink.configuration.*;
+import org.apache.flink.configuration.description.Description;
 import org.apache.flink.core.plugin.PluginManager;
 import org.apache.flink.runtime.taskexecutor.TaskExecutorResourceUtils;
 import org.apache.flink.util.Preconditions;
@@ -38,6 +32,33 @@ import static org.apache.flink.runtime.minicluster.RpcServiceSharing.SHARED;
 
 /** Configuration object for the {@link MiniCluster}. */
 public class MiniClusterConfiguration {
+
+    public static final ConfigOption<Duration> GATEWAY_RETRIEVER_INITIAL_BACKOFF =
+            ConfigOptions.key("minicluster.initial-backoff")
+                    .durationType()
+                    .defaultValue(Duration.ofMillis(10))
+                    .withDescription(
+                            Description.builder()
+                                    .text("The initial duration between cleanup " + "retries.")
+                                    .build());
+    public static final ConfigOption<Duration> GATEWAY_RETRIEVER_MAX_BACKOFF =
+            ConfigOptions.key("minicluster.max-backoff")
+                    .durationType()
+                    .defaultValue(Duration.ofSeconds(10))
+                    .withDescription(
+                            Description.builder()
+                                    .text(
+                                            "The highest possible duration between cleanup "
+                                                    + "retries.")
+                                    .build());
+    public static final ConfigOption<Integer> GATEWAY_RETRIEVER_MAX_ATTEMPTS =
+            ConfigOptions.key("minicluster.max-attempts")
+                    .intType()
+                    .defaultValue(Integer.MAX_VALUE)
+                    .withDescription(
+                            Description.builder()
+                                    .text("The number of mini cluster gateway retrieval attempts.")
+                                    .build());
 
     static final int DEFAULT_IO_POOL_SIZE = 4;
 
