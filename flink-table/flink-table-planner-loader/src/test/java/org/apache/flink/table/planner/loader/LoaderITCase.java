@@ -49,6 +49,8 @@ public class LoaderITCase extends TestLogger {
 
     @Test
     public void testExecutorFactory() {
+        // print classpath to stdout
+        System.out.println("++ CP = " + System.getProperty("java.class.path"));
         assertThat(
                         DelegateExecutorFactory.class
                                 .getClassLoader()
